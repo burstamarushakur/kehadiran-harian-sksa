@@ -19,7 +19,14 @@
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxphS1-lxJ_E6u8tB4I-xCdW6MXaKaIlH2D50pSZfppqfNwtqHkDHAMbfwncs0ydvJv/exec';
 
     function App() {
-      const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
+      // SET TARIKH AUTOMATIK IKUT MALAYSIA (UTC+8)
+      const getTodayMalaysia = () => {
+        const now = new Date();
+        const malaysiaTime = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+        return malaysiaTime.toISOString().split('T')[0];
+      };
+
+      const [currentDate, setCurrentDate] = useState(getTodayMalaysia());
       const [studentsData, setStudentsData] = useState({});
       const [attendanceData, setAttendanceData] = useState({});
       const [currentView, setCurrentView] = useState('dashboard');
@@ -97,33 +104,21 @@
         });
       };
 
-      // 1. LOADING MULA-MULA (DALMAN + VIBRATE)
       if (isLoading) return (
         <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white animate-fade-in text-center p-6">
-            <img 
-              src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" 
-              className="w-40 h-40 object-contain animate-vibrate" 
-            />
+            <img src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" className="w-40 h-40 object-contain animate-vibrate" />
             <div>
-                <p className="font-black text-slate-800 tracking-[0.2em] uppercase text-xl">
-                    Dalman sedang memerhatikan anda
-                </p>
+                <p className="font-black text-slate-800 tracking-[0.2em] uppercase text-xl">Dalman sedang memerhatikan anda</p>
                 <p className="text-slate-400 text-[10px] mt-2 font-bold uppercase tracking-widest">Sila tunggu sebentar...</p>
             </div>
         </div>
       );
 
-      // 2. LOADING MASA HANTAR (GPK HEM + HOP)
       if (isSubmitting) return (
         <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white animate-fade-in text-center p-6">
-            <img 
-              src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" 
-              className="w-40 h-40 object-contain animate-hop" 
-            />
+            <img src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" className="w-40 h-40 object-contain animate-hop" />
             <div>
-                <p className="font-black text-indigo-700 tracking-tight uppercase text-xl leading-tight">
-                    GPK HEM berterima kasih<br/>atas kerjasama anda
-                </p>
+                <p className="font-black text-indigo-700 tracking-tight uppercase text-xl leading-tight">GPK HEM berterima kasih<br/>atas kerjasama anda</p>
                 <div className="mt-6 flex justify-center gap-2">
                     <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0s'}}></div>
                     <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0.1s'}}></div>
@@ -152,25 +147,25 @@
                 </div>
               </div>
 
-              {/* Stats Grid */}
+              {/* Stats */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="bg-white p-4 rounded-xl border shadow-sm"><p className="text-[10px] text-slate-500 mb-1 font-bold uppercase">Status Pengisian</p><p className="text-xl md:text-2xl font-black text-slate-800">{stats.sub} / {stats.totalC} <span className="text-xs font-normal">Kelas</span></p></div>
-                <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 shadow-sm"><p className="text-[10px] text-rose-600 mb-1 font-bold uppercase">Tidak Hadir</p><p className="text-xl md:text-2xl font-black text-rose-700">{stats.absent} <span className="text-xs font-normal">Murid</span></p></div>
-                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 col-span-2 md:col-span-1 shadow-sm"><p className="text-[10px] text-indigo-600 mb-1 font-bold uppercase">% Kehadiran</p><p className="text-xl md:text-2xl font-black text-indigo-700">{stats.pct}%</p></div>
+                <div className="bg-white p-4 rounded-xl border shadow-sm"><p className="text-[10px] text-slate-500 mb-1 font-bold uppercase tracking-widest">Status Pengisian</p><p className="text-xl md:text-2xl font-black text-slate-800">{stats.sub} / {stats.totalC} <span className="text-xs font-normal">Kelas</span></p></div>
+                <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 shadow-sm"><p className="text-[10px] text-rose-600 mb-1 font-bold uppercase tracking-widest">Tidak Hadir</p><p className="text-xl md:text-2xl font-black text-rose-700">{stats.absent} <span className="text-xs font-normal">Murid</span></p></div>
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 col-span-2 md:col-span-1 shadow-sm"><p className="text-[10px] text-indigo-600 mb-1 font-bold uppercase tracking-widest">% Kehadiran</p><p className="text-xl md:text-2xl font-black text-indigo-700">{stats.pct}%</p></div>
               </div>
 
               {/* Senarai Kelas */}
               <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-                <div className="p-4 border-b bg-slate-50/50 font-bold text-slate-700 text-xs tracking-widest uppercase">Senarai Kelas Harian</div>
+                <div className="p-4 border-b bg-slate-50/50 font-bold text-slate-700 text-xs tracking-[0.2em] uppercase">Senarai Kelas Harian</div>
                 
-                {/* Mobile */}
+                {/* Mobile View */}
                 <div className="md:hidden divide-y divide-slate-100">
                   {Object.keys(studentsData).map(c => {
                     const d = (attendanceData[currentDate] || {})[c];
                     return (
                       <div key={c} className="p-4 space-y-4">
                         <div className="flex justify-between items-start">
-                            <div><p className="font-black text-slate-800 text-lg uppercase tracking-tighter">{c}</p><p className="text-[10px] text-slate-400 font-bold uppercase">{studentsData[c].length} Murid</p></div>
+                            <div><p className="font-black text-slate-800 text-lg uppercase tracking-tighter">{c}</p><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{studentsData[c].length} Murid</p></div>
                             {d ? <span className="bg-emerald-100 text-emerald-700 text-[10px] px-3 py-1 rounded-full font-black ring-1 ring-emerald-200">✓ SELESAI</span> : <span className="bg-amber-100 text-amber-700 text-[10px] px-3 py-1 rounded-full font-black ring-1 ring-amber-200">⏳ BELUM</span>}
                         </div>
                         {d && d.bilTakHadir > 0 && (
@@ -178,13 +173,13 @@
                                 {d.namaTakHadir.map((n, i) => <span key={i} className="bg-rose-50 text-rose-600 text-[10px] px-2 py-1 rounded-lg border border-rose-100 font-bold">{n}</span>)}
                             </div>
                         )}
-                        <button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className={`w-full py-4 rounded-2xl text-sm font-black uppercase tracking-widest shadow-sm transition-all active:scale-95 ${d ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{d ? 'Kemaskini' : 'Isi Kehadiran'}</button>
+                        <button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className={`w-full py-4 rounded-2xl text-sm font-black uppercase tracking-[0.2em] shadow-sm transition-all active:scale-95 ${d ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white shadow-md shadow-indigo-100'}`}>{d ? 'Kemaskini' : 'Isi Kehadiran'}</button>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Desktop */}
+                {/* Desktop View */}
                 <table className="hidden md:table w-full text-left">
                   <thead className="bg-slate-50 border-b text-[10px] uppercase text-slate-400 font-black tracking-widest">
                     <tr><th className="p-5">Nama Kelas</th><th>Status</th><th>Bil</th><th>Nama Murid Tidak Hadir</th><th className="text-right p-5">Tindakan</th></tr>
@@ -194,18 +189,18 @@
                       const d = (attendanceData[currentDate] || {})[c];
                       return (
                         <tr key={c} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="p-5"><strong>{c}</strong><br/><span className="text-[10px] text-slate-400 font-bold uppercase">{studentsData[c].length} Murid</span></td>
-                          <td>{d ? <span className="text-emerald-600 font-black text-xs">✓ SELESAI</span> : <span className="text-amber-500 font-black text-xs italic tracking-tighter">⏳ BELUM DIISI</span>}</td>
+                          <td className="p-5"><strong>{c}</strong><br/><span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{studentsData[c].length} Murid</span></td>
+                          <td>{d ? <span className="text-emerald-600 font-black text-xs">✓ SELESAI</span> : <span className="text-amber-500 font-black text-xs italic tracking-tighter uppercase">⏳ Belum Diisi</span>}</td>
                           <td className="font-black text-slate-700">{d ? d.bilTakHadir : '-'}</td>
                           <td>
                             {d && d.bilTakHadir > 0 ? (
                                 <div className="flex flex-wrap gap-1 max-w-sm py-2">
                                     {d.namaTakHadir.map((n, i) => <span key={i} className="bg-rose-50 text-rose-600 text-[10px] px-2 py-1 rounded-md border border-rose-100 font-bold shadow-sm">{n}</span>)}
                                 </div>
-                            ) : d ? <span className="text-slate-300 italic text-xs font-medium">Tiada (Semua Hadir)</span> : '-'}
+                            ) : d ? <span className="text-slate-300 italic text-xs font-medium tracking-tight">Tiada (Semua Hadir)</span> : '-'}
                           </td>
                           <td className="p-5 text-right">
-                            <button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className={`px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all ${d ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100'}`}>{d ? 'Kemaskini' : 'Isi Kehadiran'}</button>
+                            <button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className={`px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${d ? 'bg-slate-100 text-slate-400 hover:bg-slate-200' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100'}`}>{d ? 'Kemaskini' : 'Isi Kehadiran'}</button>
                           </td>
                         </tr>
                       );
@@ -217,8 +212,7 @@
           ) : (
             /* FORM VIEW */
             <div className="bg-white p-6 rounded-3xl border shadow-2xl max-w-lg mx-auto w-full my-auto animate-slide-up border-slate-100">
-              {/* BUTANG KEMBALI */}
-              <button onClick={() => setCurrentView('dashboard')} className="flex items-center text-xs font-black text-slate-400 hover:text-indigo-600 uppercase tracking-[0.2em] mb-10 group transition-all">
+              <button onClick={() => setCurrentView('dashboard')} className="flex items-center text-xs font-black text-slate-400 hover:text-indigo-600 uppercase tracking-[0.3em] mb-10 group transition-all">
                 <i className="fas fa-arrow-left mr-2 group-hover:-translate-x-2 transition-transform"></i> Kembali ke Halaman Utama
               </button>
 
@@ -234,8 +228,8 @@
                 </div>
 
                 {formBilTakHadir > 0 && (
-                  <div className="space-y-5 p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">2. Pilih Nama Murid:</p>
+                  <div className="space-y-5 p-5 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-2">2. Pilih Nama Murid:</p>
                     {Array.from({ length: formBilTakHadir }).map((_, i) => (
                       <div key={i} className="animate-fade-in">
                         <select className="w-full p-4 bg-white border-2 border-slate-100 rounded-xl shadow-sm font-bold text-slate-700 outline-none focus:border-rose-400 transition-all cursor-pointer" value={formSelectedNames[i]} onChange={e => { const n = [...formSelectedNames]; n[i] = e.target.value; setFormSelectedNames(n); }}>
@@ -250,16 +244,16 @@
                 {formError && <div className="bg-rose-50 p-4 rounded-2xl border border-rose-200 text-rose-600 text-[10px] font-black flex items-center gap-3 animate-bounce uppercase tracking-tighter"><i className="fas fa-exclamation-circle text-lg"></i>{formError}</div>}
                 
                 <div className="pt-6 space-y-4 text-center">
-                    <button onClick={handleSubmit} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase tracking-widest">HANTAR LAPORAN KEHADIRAN</button>
-                    <button onClick={() => setCurrentView('dashboard')} className="w-full py-2 text-slate-300 text-[10px] font-black uppercase tracking-[0.3em] hover:text-rose-500 transition-colors">BATAL</button>
+                    <button onClick={handleSubmit} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase tracking-[0.2em]" disabled={isSubmitting}>{isSubmitting ? 'MENYIMPAN DATA...' : 'HANTAR LAPORAN'}</button>
+                    <button onClick={() => setCurrentView('dashboard')} className="w-full py-2 text-slate-300 text-[10px] font-black uppercase tracking-[0.4em] hover:text-rose-500 transition-colors">BATAL</button>
                 </div>
               </div>
             </div>
           )}
 
           <footer className="mt-16 text-center text-slate-300 text-[10px] uppercase border-t border-slate-100 pt-10 pb-12">
-            <p className="mb-2 tracking-[0.3em] font-bold">@HAK MILIK UNIT HEM, SK SG ABONG</p>
-            <p className="font-black text-slate-400 tracking-tight tracking-widest">MODERATOR: ACAP GARANG</p>
+            <p className="mb-2 tracking-[0.3em] font-bold uppercase">@HAK MILIK UNIT HEM, SK SG ABONG</p>
+            <p className="font-black text-slate-400 tracking-tighter tracking-widest uppercase">MODERATOR: ACAP GARANG</p>
           </footer>
         </div>
       );
@@ -273,7 +267,6 @@
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
     body { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.02em; }
     
-    /* ANIMASI BERGETAR */
     @keyframes vibrate {
       0% { transform: translate(0); }
       10% { transform: translate(-2px, -2px) rotate(-1deg); }
@@ -284,7 +277,6 @@
     }
     .animate-vibrate { animation: vibrate 0.1s linear infinite; }
 
-    /* ANIMASI MELOMPAT KECIL */
     @keyframes hop {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-15px); }
