@@ -16,7 +16,6 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    // URL GAS CIKGU
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxphS1-lxJ_E6u8tB4I-xCdW6MXaKaIlH2D50pSZfppqfNwtqHkDHAMbfwncs0ydvJv/exec';
 
     function App() {
@@ -90,53 +89,82 @@
         finally { setIsSubmitting(false); }
       };
 
+      if (isLoading) return <div className="flex h-screen items-center justify-center flex-col gap-4"><i className="fas fa-spinner fa-spin text-4xl text-indigo-600"></i><p>Memuatkan data HEM...</p></div>;
+
       return (
-        <div className="max-w-6xl mx-auto p-4 md:p-8">
+        <div className="max-w-6xl mx-auto p-4 md:p-8 min-h-screen flex flex-col">
           {currentView === 'dashboard' ? (
-            <div className="space-y-6">
+            <div className="space-y-6 flex-grow">
               {/* Header */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center space-x-6">
                   <img src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" className="w-24 h-24 md:w-40 md:h-40 object-contain rounded-xl" />
                   <div>
-                    <h1 className="text-lg md:text-2xl font-bold text-slate-800">DASHBOARD KEHADIRAN HARIAN MURID</h1>
-                    <p className="text-sm md:text-lg font-semibold text-slate-500 uppercase">Unit HEM, SK Sg Abong</p>
+                    <h1 className="text-lg md:text-2xl font-bold text-slate-800 leading-tight">DASHBOARD KEHADIRAN HARIAN MURID</h1>
+                    <p className="text-sm md:text-lg font-semibold text-slate-500">UNIT HEM, SK SG ABONG</p>
                   </div>
                 </div>
-                <input type="date" className="p-3 bg-slate-50 rounded-lg border font-bold" value={currentDate} onChange={e => setCurrentDate(e.target.value)} />
+                <div className="flex items-center space-x-2 bg-slate-50 p-2 rounded-lg border">
+                    <i className="far fa-calendar-alt text-indigo-600"></i>
+                    <input type="date" className="bg-transparent border-none font-bold text-slate-700 outline-none" value={currentDate} onChange={e => setCurrentDate(e.target.value)} />
+                </div>
               </div>
 
-              {/* Stats */}
+              {/* Stats Grid */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="bg-white p-4 rounded-xl border text-center"><p className="text-xs text-slate-500">Status</p><p className="text-xl font-bold">{stats.sub}/{stats.totalC}</p></div>
-                <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 text-center"><p className="text-xs text-rose-600">Tidak Hadir</p><p className="text-xl font-bold text-rose-700">{stats.absent}</p></div>
-                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-center col-span-2 md:col-span-1"><p className="text-xs text-indigo-600">% Kehadiran</p><p className="text-xl font-bold text-indigo-700">{stats.pct}%</p></div>
+                <div className="bg-white p-4 rounded-xl border"><p className="text-xs text-slate-500 mb-1 font-bold uppercase">Status Pengisian</p><p className="text-xl md:text-2xl font-black text-slate-800">{stats.sub} / {stats.totalC} <span className="text-xs font-normal">Kelas</span></p></div>
+                <div className="bg-rose-50 p-4 rounded-xl border border-rose-100"><p className="text-xs text-rose-600 mb-1 font-bold uppercase">Tidak Hadir</p><p className="text-xl md:text-2xl font-black text-rose-700">{stats.absent} <span className="text-xs font-normal">Murid</span></p></div>
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 col-span-2 md:col-span-1"><p className="text-xs text-indigo-600 mb-1 font-bold uppercase">% Kehadiran</p><p className="text-xl md:text-2xl font-black text-indigo-700">{stats.pct}%</p></div>
               </div>
 
-              {/* List */}
-              <div className="bg-white rounded-xl border overflow-hidden">
-                <div className="md:hidden">
+              {/* Classes Section */}
+              <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                <div className="p-4 border-b bg-slate-50 font-bold text-slate-700">Senarai Kelas</div>
+                
+                {/* Mobile View */}
+                <div className="md:hidden divide-y">
                   {Object.keys(studentsData).map(c => {
                     const d = (attendanceData[currentDate] || {})[c];
                     return (
-                      <div key={c} className="p-4 border-b">
-                        <div className="flex justify-between mb-2"><strong>{c}</strong> {d ? <span className="text-emerald-600 text-xs font-bold">Selesai</span> : <span className="text-amber-600 text-xs">Belum</span>}</div>
-                        <button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm">{d ? 'Kemaskini' : 'Isi Kehadiran'}</button>
+                      <div key={c} className="p-4 space-y-3">
+                        <div className="flex justify-between items-start">
+                            <div><p className="font-bold text-slate-800">{c}</p><p className="text-[10px] text-slate-400">{studentsData[c].length} Murid</p></div>
+                            {d ? <span className="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-1 rounded-full font-bold">✓ Selesai</span> : <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-1 rounded-full font-bold">⏳ Belum</span>}
+                        </div>
+                        {d && d.bilTakHadir > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                                {d.namaTakHadir.map((n, i) => <span key={i} className="bg-rose-50 text-rose-600 text-[10px] px-2 py-1 rounded border border-rose-100">{n}</span>)}
+                            </div>
+                        )}
+                        <button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className={`w-full py-2 rounded-lg text-sm font-bold ${d ? 'bg-slate-100 text-slate-600' : 'bg-indigo-600 text-white'}`}>{d ? 'Kemaskini' : 'Isi Kehadiran'}</button>
                       </div>
                     );
                   })}
                 </div>
+
+                {/* Desktop View */}
                 <table className="hidden md:table w-full text-left">
-                  <thead className="bg-slate-50"><tr><th className="p-4">Kelas</th><th>Status</th><th>Bil</th><th>Tindakan</th></tr></thead>
-                  <tbody>
+                  <thead className="bg-slate-50 border-b text-xs uppercase text-slate-500 font-bold">
+                    <tr><th className="p-4">Kelas</th><th>Status</th><th>Bil</th><th>Nama Murid Tidak Hadir</th><th className="text-right p-4">Tindakan</th></tr>
+                  </thead>
+                  <tbody className="divide-y text-sm">
                     {Object.keys(studentsData).map(c => {
                       const d = (attendanceData[currentDate] || {})[c];
                       return (
-                        <tr key={c} className="border-t">
-                          <td className="p-4 font-bold">{c}</td>
-                          <td>{d ? '✅ Selesai' : '⏳ Belum'}</td>
-                          <td>{d ? d.bilTakHadir : '-'}</td>
-                          <td><button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className="px-4 py-1 bg-indigo-600 text-white rounded">Isi</button></td>
+                        <tr key={c} className="hover:bg-slate-50">
+                          <td className="p-4"><strong>{c}</strong><br/><span className="text-[10px] text-slate-400">{studentsData[c].length} Murid</span></td>
+                          <td>{d ? <span className="text-emerald-600 font-bold">✓ Selesai</span> : <span className="text-amber-500">⏳ Belum</span>}</td>
+                          <td className="font-bold">{d ? d.bilTakHadir : '-'}</td>
+                          <td>
+                            {d && d.bilTakHadir > 0 ? (
+                                <div className="flex flex-wrap gap-1 max-w-xs py-2">
+                                    {d.namaTakHadir.map((n, i) => <span key={i} className="bg-rose-50 text-rose-600 text-[10px] px-2 py-0.5 rounded border border-rose-100">{n}</span>)}
+                                </div>
+                            ) : d ? <span className="text-slate-400 italic text-xs">Hadir Semua</span> : '-'}
+                          </td>
+                          <td className="p-4 text-right">
+                            <button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className={`px-4 py-2 rounded-lg font-bold text-xs ${d ? 'bg-slate-100 text-slate-600' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>{d ? 'Kemaskini' : 'Isi Kehadiran'}</button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -145,30 +173,38 @@
               </div>
             </div>
           ) : (
-            <div className="bg-white p-6 rounded-2xl border max-w-lg mx-auto">
-              <h2 className="text-xl font-bold mb-4">Isi Kehadiran: {selectedClass}</h2>
-              <div className="space-y-4">
-                <label className="block text-sm">Bilangan Tidak Hadir:</label>
-                <select className="w-full p-2 border rounded" value={formBilTakHadir} onChange={e => { const v = parseInt(e.target.value); setFormBilTakHadir(v); setFormSelectedNames(new Array(v).fill('')); }}>
-                  {[...Array(studentsData[selectedClass].length + 1).keys()].map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
-                {Array.from({ length: formBilTakHadir }).map((_, i) => (
-                  <select key={i} className="w-full p-2 border rounded mb-2" value={formSelectedNames[i]} onChange={e => { const n = [...formSelectedNames]; n[i] = e.target.value; setFormSelectedNames(n); }}>
-                    <option value="">Pilih Nama</option>
-                    {studentsData[selectedClass].map(s => <option key={s} value={s}>{s}</option>)}
+            <div className="bg-white p-6 rounded-2xl border shadow-xl max-w-lg mx-auto w-full my-auto animate-fade-in">
+              <h2 className="text-xl font-bold mb-1 text-slate-800">Isi Kehadiran: {selectedClass}</h2>
+              <p className="text-xs text-slate-500 mb-6 font-bold uppercase">Unit HEM SK Sg Abong</p>
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Bilangan Murid Tidak Hadir:</label>
+                  <select className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-200" value={formBilTakHadir} onChange={e => { const v = parseInt(e.target.value); setFormBilTakHadir(v); setFormSelectedNames(new Array(v).fill('')); }}>
+                    {[...Array(studentsData[selectedClass].length + 1).keys()].map(n => <option key={n} value={n}>{n} Orang</option>)}
                   </select>
+                </div>
+                {Array.from({ length: formBilTakHadir }).map((_, i) => (
+                  <div key={i} className="animate-slide-up">
+                    <label className="text-[10px] font-bold text-slate-400 ml-1">Nama Murid {i+1}:</label>
+                    <select className="w-full p-3 bg-white border rounded-xl shadow-sm outline-none focus:ring-2 focus:ring-rose-200" value={formSelectedNames[i]} onChange={e => { const n = [...formSelectedNames]; n[i] = e.target.value; setFormSelectedNames(n); }}>
+                        <option value="">-- Pilih Nama --</option>
+                        {studentsData[selectedClass].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
                 ))}
-                {formError && <p className="text-rose-500 text-xs">{formError}</p>}
-                <button onClick={handleSubmit} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold" disabled={isSubmitting}>{isSubmitting ? 'Menyimpan...' : 'Hantar'}</button>
-                <button onClick={() => setCurrentView('dashboard')} className="w-full text-slate-400 text-sm">Batal</button>
+                {formError && <div className="bg-rose-50 p-3 rounded-lg border border-rose-100 text-rose-600 text-xs font-bold flex items-center gap-2"><i className="fas fa-exclamation-circle"></i>{formError}</div>}
+                <div className="pt-4 space-y-3">
+                    <button onClick={handleSubmit} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all disabled:opacity-50" disabled={isSubmitting}>{isSubmitting ? 'MENYIMPAN DATA...' : 'HANTAR LAPORAN'}</button>
+                    <button onClick={() => setCurrentView('dashboard')} className="w-full py-2 text-slate-400 text-sm font-bold hover:text-slate-600">BATAL</button>
+                </div>
               </div>
             </div>
           )}
 
           {/* Footer */}
-          <footer className="mt-12 text-center text-slate-400 text-xs uppercase border-t pt-6">
-            <p>@HAK MILIK UNIT HEM, SK SG ABONG</p>
-            <p className="font-bold">MODERATOR: ACAP GARANG</p>
+          <footer className="mt-12 text-center text-slate-400 text-[10px] md:text-xs uppercase border-t pt-8 pb-8">
+            <p className="mb-1">@HAK MILIK UNIT HEM, SK SG ABONG</p>
+            <p className="font-black text-slate-500">MODERATOR: ACAP GARANG</p>
           </footer>
         </div>
       );
@@ -177,5 +213,12 @@
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
+  
+  <style>
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+    .animate-slide-up { animation: slideUp 0.3s ease-out; }
+  </style>
 </body>
 </html>
