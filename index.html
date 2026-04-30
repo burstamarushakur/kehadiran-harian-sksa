@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Kehadiran HEM SKSA</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // URL GAS CIKGU
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbxphS1-lxJ_E6u8tB4I-xCdW6MXaKaIlH2D50pSZfppqfNwtqHkDHAMbfwncs0ydvJv/exec';
+
+    function App() {
+      const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
+      const [studentsData, setStudentsData] = useState({});
+      const [attendanceData, setAttendanceData] = useState({});
+      const [currentView, setCurrentView] = useState('dashboard');
+      const [selectedClass, setSelectedClass] = useState(null);
+      const [isLoading, setIsLoading] = useState(true);
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [formBilTakHadir, setFormBilTakHadir] = useState(0);
+      const [formSelectedNames, setFormSelectedNames] = useState([]);
+      const [formError, setFormError] = useState('');
+
+      const formatDateDisplay = (dateString) => {
+        if (!dateString) return '';
+        const [year, month, day] = dateString.split('-');
+        return `${day}-${month}-${year}`;
+      };
+
+      useEffect(() => {
+        const fetchAllData = async () => {
+          setIsLoading(true);
+          try {
+            const [classesRes, attendanceRes] = await Promise.all([
+              fetch(`${GAS_URL}?action=getClasses`).then(res => res.json()),
+              fetch(`${GAS_URL}?action=getAttendance`).then(res => res.json())
+            ]);
+            if (classesRes.status === 'success') setStudentsData(classesRes.data);
+            if (attendanceRes.status === 'success') {
+              const loadedAttendance = {};
+              attendanceRes.data.forEach(record => {
+                let yyyymmdd = record.tarikh;
+                if (record.tarikh.includes('-')) {
+                  const parts = record.tarikh.split('-');
+                  if (parts.length === 3 && parts[2].length === 4) yyyymmdd = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                }
+                if (!loadedAttendance[yyyymmdd]) loadedAttendance[yyyymmdd] = {};
+                loadedAttendance[yyyymmdd][record.kelas] = {
+                  status: 'Selesai',
+                  bilTakHadir: parseInt(record.bilTakHadir) || 0,
+                  namaTakHadir: record.namaTakHadir[0] === 'Hadir Semua' ? [] : record.namaTakHadir
+                };
+              });
+              setAttendanceData(loadedAttendance);
+            }
+          } catch (err) { console.error(err); }
+          finally { setIsLoading(false); }
+        };
+        fetchAllData();
+      }, []);
+
+      const stats = useMemo(() => {
+        const daily = attendanceData[currentDate] || {};
+        let sub = 0, totalS = 0, absent = 0;
+        Object.entries(studentsData).forEach(([name, list]) => {
+          totalS += list.length;
+          if (daily[name]) { sub++; absent += daily[name].bilTakHadir; }
+        });
+        return { sub, totalC: Object.keys(studentsData).length, totalS, absent, pct: totalS > 0 ? (((totalS - absent) / totalS) * 100).toFixed(1) : 0 };
+      }, [attendanceData, currentDate, studentsData]);
+
+      const handleSubmit = async () => {
+        if (formSelectedNames.some(n => !n)) return setFormError('Sila pilih semua nama.');
+        setIsSubmitting(true);
+        try {
+          await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'simpanKehadiran', payload: { tarikh: formatDateDisplay(currentDate), kelas: selectedClass, bilTakHadir: formBilTakHadir, namaTakHadir: formSelectedNames }}) });
+          setAttendanceData(prev => ({ ...prev, [currentDate]: { ...prev[currentDate], [selectedClass]: { status: 'Selesai', bilTakHadir: formBilTakHadir, namaTakHadir: formSelectedNames }}}));
+          setCurrentView('dashboard');
+        } catch (e) { setFormError('Gagal simpan.'); }
+        finally { setIsSubmitting(false); }
+      };
+
+      return (
+        <div className="max-w-6xl mx-auto p-4 md:p-8">
+          {currentView === 'dashboard' ? (
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center space-x-6">
+                  <img src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" className="w-24 h-24 md:w-40 md:h-40 object-contain rounded-xl" />
+                  <div>
+                    <h1 className="text-lg md:text-2xl font-bold text-slate-800">DASHBOARD KEHADIRAN HARIAN MURID</h1>
+                    <p className="text-sm md:text-lg font-semibold text-slate-500 uppercase">Unit HEM, SK Sg Abong</p>
+                  </div>
+                </div>
+                <input type="date" className="p-3 bg-slate-50 rounded-lg border font-bold" value={currentDate} onChange={e => setCurrentDate(e.target.value)} />
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="bg-white p-4 rounded-xl border text-center"><p className="text-xs text-slate-500">Status</p><p className="text-xl font-bold">{stats.sub}/{stats.totalC}</p></div>
+                <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 text-center"><p className="text-xs text-rose-600">Tidak Hadir</p><p className="text-xl font-bold text-rose-700">{stats.absent}</p></div>
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-center col-span-2 md:col-span-1"><p className="text-xs text-indigo-600">% Kehadiran</p><p className="text-xl font-bold text-indigo-700">{stats.pct}%</p></div>
+              </div>
+
+              {/* List */}
+              <div className="bg-white rounded-xl border overflow-hidden">
+                <div className="md:hidden">
+                  {Object.keys(studentsData).map(c => {
+                    const d = (attendanceData[currentDate] || {})[c];
+                    return (
+                      <div key={c} className="p-4 border-b">
+                        <div className="flex justify-between mb-2"><strong>{c}</strong> {d ? <span className="text-emerald-600 text-xs font-bold">Selesai</span> : <span className="text-amber-600 text-xs">Belum</span>}</div>
+                        <button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm">{d ? 'Kemaskini' : 'Isi Kehadiran'}</button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <table className="hidden md:table w-full text-left">
+                  <thead className="bg-slate-50"><tr><th className="p-4">Kelas</th><th>Status</th><th>Bil</th><th>Tindakan</th></tr></thead>
+                  <tbody>
+                    {Object.keys(studentsData).map(c => {
+                      const d = (attendanceData[currentDate] || {})[c];
+                      return (
+                        <tr key={c} className="border-t">
+                          <td className="p-4 font-bold">{c}</td>
+                          <td>{d ? '✅ Selesai' : '⏳ Belum'}</td>
+                          <td>{d ? d.bilTakHadir : '-'}</td>
+                          <td><button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className="px-4 py-1 bg-indigo-600 text-white rounded">Isi</button></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white p-6 rounded-2xl border max-w-lg mx-auto">
+              <h2 className="text-xl font-bold mb-4">Isi Kehadiran: {selectedClass}</h2>
+              <div className="space-y-4">
+                <label className="block text-sm">Bilangan Tidak Hadir:</label>
+                <select className="w-full p-2 border rounded" value={formBilTakHadir} onChange={e => { const v = parseInt(e.target.value); setFormBilTakHadir(v); setFormSelectedNames(new Array(v).fill('')); }}>
+                  {[...Array(studentsData[selectedClass].length + 1).keys()].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+                {Array.from({ length: formBilTakHadir }).map((_, i) => (
+                  <select key={i} className="w-full p-2 border rounded mb-2" value={formSelectedNames[i]} onChange={e => { const n = [...formSelectedNames]; n[i] = e.target.value; setFormSelectedNames(n); }}>
+                    <option value="">Pilih Nama</option>
+                    {studentsData[selectedClass].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                ))}
+                {formError && <p className="text-rose-500 text-xs">{formError}</p>}
+                <button onClick={handleSubmit} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold" disabled={isSubmitting}>{isSubmitting ? 'Menyimpan...' : 'Hantar'}</button>
+                <button onClick={() => setCurrentView('dashboard')} className="w-full text-slate-400 text-sm">Batal</button>
+              </div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <footer className="mt-12 text-center text-slate-400 text-xs uppercase border-t pt-6">
+            <p>@HAK MILIK UNIT HEM, SK SG ABONG</p>
+            <p className="font-bold">MODERATOR: ACAP GARANG</p>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
