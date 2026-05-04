@@ -16,6 +16,7 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
+    // PASTIKAN URL INI ADALAH URL DEPLOYMENT GOOGLE SCRIPT CIKGU
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxphS1-lxJ_E6u8tB4I-xCdW6MXaKaIlH2D50pSZfppqfNwtqHkDHAMbfwncs0ydvJv/exec';
 
     function App() {
@@ -36,14 +37,12 @@
       const [formSelectedNames, setFormSelectedNames] = useState([]);
       const [formError, setFormError] = useState('');
 
-      // Format untuk dihantar ke Google Sheet (Kekal kebal)
       const formatDateDisplay = (dateString) => {
         if (!dateString) return '';
         const [year, month, day] = dateString.split('-');
         return `${day}-${month}-${year}`;
       };
 
-      // FUNGSI BARU: Format khas paparan untuk cikgu otai (DD/MM/YYYY)
       const getDisplayDateText = (dateString) => {
         if (!dateString) return '';
         const [year, month, day] = dateString.split('-');
@@ -153,16 +152,17 @@
                   </div>
                 </div>
                 
-                {/* TRIK NINJA: KOTAK TARIKH DD/MM/YYYY */}
+                {/* FIX KALENDAR: Ditambah fungsi paksa buka (showPicker) */}
                 <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 flex items-center gap-3 relative cursor-pointer hover:bg-indigo-100 transition-all group overflow-hidden shadow-sm">
                     <i className="far fa-calendar-check text-indigo-600 text-xl group-hover:scale-110 transition-transform"></i>
                     <span className="font-black text-indigo-800 text-lg tracking-wider">{getDisplayDateText(currentDate)}</span>
                     <input 
                       type="date" 
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
                       value={currentDate} 
                       onChange={e => setCurrentDate(e.target.value)} 
-                      title="Pilih Tarikh"
+                      onClick={(e) => { try { e.target.showPicker(); } catch(err) {} }}
+                      title="Pilih Tarikh Lain"
                     />
                 </div>
               </div>
