@@ -36,10 +36,18 @@
       const [formSelectedNames, setFormSelectedNames] = useState([]);
       const [formError, setFormError] = useState('');
 
+      // Format untuk dihantar ke Google Sheet (Kekal kebal)
       const formatDateDisplay = (dateString) => {
         if (!dateString) return '';
         const [year, month, day] = dateString.split('-');
         return `${day}-${month}-${year}`;
+      };
+
+      // FUNGSI BARU: Format khas paparan untuk cikgu otai (DD/MM/YYYY)
+      const getDisplayDateText = (dateString) => {
+        if (!dateString) return '';
+        const [year, month, day] = dateString.split('-');
+        return `${day}/${month}/${year}`;
       };
 
       const normalizeDate = (str) => {
@@ -144,9 +152,18 @@
                     <p className="text-xs font-bold text-slate-400 tracking-widest uppercase mt-1">UNIT HEM, MUAR JOHOR</p>
                   </div>
                 </div>
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-3">
-                    <i className="far fa-calendar-check text-indigo-600 text-xl"></i>
-                    <input type="date" className="bg-transparent border-none font-black text-slate-700 outline-none" value={currentDate} onChange={e => setCurrentDate(e.target.value)} />
+                
+                {/* TRIK NINJA: KOTAK TARIKH DD/MM/YYYY */}
+                <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 flex items-center gap-3 relative cursor-pointer hover:bg-indigo-100 transition-all group overflow-hidden shadow-sm">
+                    <i className="far fa-calendar-check text-indigo-600 text-xl group-hover:scale-110 transition-transform"></i>
+                    <span className="font-black text-indigo-800 text-lg tracking-wider">{getDisplayDateText(currentDate)}</span>
+                    <input 
+                      type="date" 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                      value={currentDate} 
+                      onChange={e => setCurrentDate(e.target.value)} 
+                      title="Pilih Tarikh"
+                    />
                 </div>
               </div>
 
