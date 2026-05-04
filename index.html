@@ -42,94 +42,69 @@
         return `${day}-${month}-${year}`;
       };
 
-      useEffect(() => {
-        const fetchAllData = async () => {
-          setIsLoading(true);
-          try {
-            const [classesRes, attendanceRes] = await Promise.all([
-              fetch(`${GAS_URL}?action=getClasses`).then(res => res.json()),
-              fetch(`${GAS_URL}?action=getAttendance`).then(res => res.json())
-            ]);
-            
-            if (classesRes.status === 'success') {
-              setStudentsData(classesRes.data);
-            }
-            
-            if (attendanceRes.status === 'success') {
-              const loadedAttendance = {};
-              attendanceRes.data.forEach(record => {
-                let yyyymmdd = "";
-                const rawTarikh = String(record.tarikh).trim();
-                
-                if (rawTarikh.includes('-')) {
-                  const parts = rawTarikh.split('-');
-                  if (parts.length === 3) {
-                    const d = parts[0].padStart(2, '0');
-                    const m = parts[1].padStart(2, '0');
-                    const y = parts[2];
-                    if (y.length === 4) yyyymmdd = `${y}-${m}-${d}`;
-                  }
-                }
-                
-                if (yyyymmdd) {
-                  if (!loadedAttendance[yyyymmdd]) loadedAttendance[yyyymmdd] = {};
-                  const kelasKey = String(record.kelas).trim();
-                  loadedAttendance[yyyymmdd][kelasKey] = {
-                    status: 'Selesai',
-                    bilTakHadir: parseInt(record.bilTakHadir) || 0,
-                    namaTakHadir: (record.namaTakHadir[0] === 'Hadir Semua' || !record.namaTakHadir[0]) ? [] : record.namaTakHadir
-                  };
-                }
-              });
-              setAttendanceData(loadedAttendance);
-            }
-          } catch (err) { console.error(err); }
-          finally { setIsLoading(false); }
-        };
-        fetchAllData();
-      }, []);
+      // Menukarkan DD-MM-YYYY dari Sheet kepada YYYY-MM-DD untuk App
+      const normalizeDate = (str) => {
+        if (!str || !str.includes('-')) return '';
+        const parts = str.split('-');
+        if (parts.length !== 3) return '';
+        const d = parts[0].padStart(2, '0');
+        const m = parts[1].padStart(2, '0');
+        const y = parts[2];
+        return `${y}-${m}-${d}`;
+      };
+
+      const fetchAllData = async () => {
+        setIsLoading(true);
+        try {
+          const [classesRes, attendanceRes] = await Promise.all([
+            fetch(`${GAS_URL}?action=getClasses`).then(res => res.json()),
+            fetch(`${GAS_URL}?action=getAttendance`).then(res => res.json())
+          ]);
+          
+          if (classesRes.status === 'success') setStudentsData(classesRes.data);
+          
+          if (attendanceRes.status === 'success') {
+            const mapped = {};
+            attendanceRes.data.forEach(rec => {
+              const isoDate = normalizeDate(rec.tarikh);
+              if (isoDate) {
+                if (!mapped[isoDate]) mapped[isoDate] = {};
+                mapped[isoDate][rec.kelas.trim()] = {
+                  status: 'Selesai',
+                  bilTakHadir: parseInt(rec.bilTakHadir),
+                  namaTakHadir: (rec.namaTakHadir[0] === 'Hadir Semua' || !rec.namaTakHadir[0]) ? [] : rec.namaTakHadir
+                };
+              }
+            });
+            setAttendanceData(mapped);
+          }
+        } catch (err) { console.error(err); }
+        finally { setIsLoading(false); }
+      };
+
+      useEffect(() => { fetchAllData(); }, []);
 
       const stats = useMemo(() => {
         const daily = attendanceData[currentDate] || {};
         let sub = 0, totalS = 0, absent = 0;
         Object.entries(studentsData).forEach(([name, list]) => {
           totalS += list.length;
-          const cleanName = name.trim();
-          if (daily[cleanName]) { 
-            sub++; 
-            absent += daily[cleanName].bilTakHadir; 
-          }
+          if (daily[name.trim()]) { sub++; absent += daily[name.trim()].bilTakHadir; }
         });
         return { sub, totalC: Object.keys(studentsData).length, totalS, absent, pct: totalS > 0 ? (((totalS - absent) / totalS) * 100).toFixed(1) : 0 };
       }, [attendanceData, currentDate, studentsData]);
 
       const handleSubmit = async () => {
-        if (formBilTakHadir > 0 && formSelectedNames.some(n => !n)) return setFormError('Sila pilih semua nama murid.');
+        if (formBilTakHadir > 0 && formSelectedNames.some(n => !n)) return setFormError('Sila pilih nama murid.');
         setIsSubmitting(true);
         try {
-          const payloadTarikh = formatDateDisplay(currentDate);
           await fetch(GAS_URL, { 
             method: 'POST', 
-            body: JSON.stringify({ 
-              action: 'simpanKehadiran', 
-              payload: { 
-                tarikh: payloadTarikh, 
-                kelas: selectedClass.trim(), 
-                bilTakHadir: formBilTakHadir, 
-                namaTakHadir: formSelectedNames 
-              }
-            }) 
+            body: JSON.stringify({ action: 'simpanKehadiran', payload: { tarikh: formatDateDisplay(currentDate), kelas: selectedClass.trim(), bilTakHadir: formBilTakHadir, namaTakHadir: formSelectedNames }}) 
           });
-          
-          setAttendanceData(prev => ({
-            ...prev,
-            [currentDate]: {
-              ...(prev[currentDate] || {}),
-              [selectedClass.trim()]: { status: 'Selesai', bilTakHadir: formBilTakHadir, namaTakHadir: formSelectedNames }
-            }
-          }));
+          await fetchAllData(); // Refresh data terus dari Sheet selepas hantar
           setCurrentView('dashboard');
-        } catch (e) { setFormError('Gagal simpan data.'); }
+        } catch (e) { setFormError('Gagal simpan.'); }
         finally { setIsSubmitting(false); }
       };
 
@@ -142,26 +117,16 @@
       };
 
       if (isLoading) return (
-        <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white animate-fade-in text-center p-6">
+        <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center">
             <img src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" className="w-40 h-40 object-contain animate-vibrate" />
-            <div>
-                <p className="font-black text-slate-800 tracking-[0.2em] uppercase text-xl">Dalman sedang memerhatikan anda</p>
-                <p className="text-slate-400 text-[10px] mt-2 font-bold uppercase tracking-widest italic">Tengah Tarikh Rekod Dari Google Sheet...</p>
-            </div>
+            <p className="font-black text-slate-800 tracking-widest uppercase">Dalman sedang memerhatikan anda</p>
         </div>
       );
 
       if (isSubmitting) return (
-        <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white animate-fade-in text-center p-6">
+        <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center">
             <img src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" className="w-40 h-40 object-contain animate-hop" />
-            <div>
-                <p className="font-black text-indigo-700 tracking-tight uppercase text-xl leading-tight">GPK HEM berterima kasih<br/>atas kerjasama anda</p>
-                <div className="mt-6 flex justify-center gap-2">
-                    <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0s'}}></div>
-                    <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0.1s'}}></div>
-                    <div className="w-3 h-3 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0.2s'}}></div>
-                </div>
-            </div>
+            <p className="font-black text-indigo-700 uppercase">GPK HEM berterima kasih atas kerjasama anda</p>
         </div>
       );
 
@@ -169,74 +134,44 @@
         <div className="max-w-6xl mx-auto p-4 md:p-8 min-h-screen flex flex-col">
           {currentView === 'dashboard' ? (
             <div className="space-y-6 flex-grow animate-fade-in">
-              {/* Header */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center space-x-6">
                   <img src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" className="w-24 h-24 md:w-40 md:h-40 object-contain rounded-xl" />
                   <div>
-                    <h1 className="text-lg md:text-2xl font-bold text-slate-800 leading-tight">DASHBOARD KEHADIRAN HARIAN MURID</h1>
-                    <p className="text-sm md:text-lg font-semibold text-slate-500 uppercase tracking-tight">Unit HEM, SK Sg Abong</p>
+                    <h1 className="text-lg md:text-2xl font-bold text-slate-800 uppercase">Dashboard Kehadiran HEM SKSA</h1>
+                    <p className="text-xs md:text-sm font-bold text-slate-400">UNIT HEM, SK SUNGAI ABONG</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2 bg-slate-50 p-3 rounded-xl border">
-                    <i className="far fa-calendar-alt text-indigo-600"></i>
-                    <input type="date" className="bg-transparent border-none font-black text-slate-700 outline-none cursor-pointer" value={currentDate} onChange={e => setCurrentDate(e.target.value)} />
-                </div>
+                <input type="date" className="p-3 bg-slate-50 border rounded-xl font-black text-slate-700" value={currentDate} onChange={e => setCurrentDate(e.target.value)} />
               </div>
 
-              {/* Stats */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="bg-white p-4 rounded-xl border shadow-sm"><p className="text-[10px] text-slate-500 mb-1 font-bold uppercase tracking-widest">Status Pengisian</p><p className="text-xl md:text-2xl font-black text-slate-800">{stats.sub} / {stats.totalC} <span className="text-xs font-normal">Kelas</span></p></div>
-                <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 shadow-sm"><p className="text-[10px] text-rose-600 mb-1 font-bold uppercase tracking-widest">Tidak Hadir</p><p className="text-xl md:text-2xl font-black text-rose-700">{stats.absent} / {stats.totalS} <span className="text-[10px] font-normal uppercase tracking-tight">Murid</span></p></div>
-                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 col-span-2 md:col-span-1 shadow-sm"><p className="text-[10px] text-indigo-600 mb-1 font-bold uppercase tracking-widest">% Kehadiran</p><p className="text-xl md:text-2xl font-black text-indigo-700">{stats.pct}%</p></div>
+                <div className="bg-white p-4 rounded-xl border shadow-sm"><p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Status Pengisian</p><p className="text-xl font-black">{stats.sub} / {stats.totalC} <span className="text-xs font-normal">Kelas</span></p></div>
+                <div className="bg-rose-50 p-4 rounded-xl border border-rose-100 shadow-sm"><p className="text-[10px] text-rose-600 font-bold uppercase mb-1">Tidak Hadir</p><p className="text-xl font-black text-rose-700">{stats.absent} / {stats.totalS} <span className="text-[10px] font-normal">Murid</span></p></div>
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 col-span-2 md:col-span-1 shadow-sm"><p className="text-[10px] text-indigo-600 font-bold uppercase mb-1">% Kehadiran</p><p className="text-xl font-black text-indigo-700">{stats.pct}%</p></div>
               </div>
 
               <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-                <div className="p-4 border-b bg-slate-50/50 font-bold text-slate-700 text-xs tracking-[0.2em] uppercase">Senarai Kelas Harian</div>
-                
-                <div className="md:hidden divide-y divide-slate-100">
-                  {Object.keys(studentsData).map(c => {
-                    const cleanC = c.trim();
-                    const d = (attendanceData[currentDate] || {})[cleanC];
-                    return (
-                      <div key={c} className="p-4 space-y-4">
-                        <div className="flex justify-between items-start">
-                            <div><p className="font-black text-slate-800 text-lg uppercase tracking-tighter">{c}</p><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{studentsData[c].length} Murid</p></div>
-                            {d ? <span className="bg-emerald-100 text-emerald-700 text-[10px] px-3 py-1 rounded-full font-black ring-1 ring-emerald-200">✓ SELESAI</span> : <span className="bg-amber-100 text-amber-700 text-[10px] px-3 py-1 rounded-full font-black ring-1 ring-amber-200">⏳ BELUM</span>}
-                        </div>
-                        {d && d.bilTakHadir > 0 && (
-                            <div className="flex flex-wrap gap-1.5 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                {d.namaTakHadir.map((n, i) => <span key={i} className="bg-rose-50 text-rose-600 text-[10px] px-2 py-1 rounded-lg border border-rose-100 font-bold">{n}</span>)}
-                            </div>
-                        )}
-                        <button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className={`w-full py-4 rounded-2xl text-sm font-black uppercase tracking-[0.2em] shadow-sm transition-all active:scale-95 ${d ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white shadow-md shadow-indigo-100'}`}>{d ? 'Kemaskini' : 'Isi Kehadiran'}</button>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <table className="hidden md:table w-full text-left">
-                  <thead className="bg-slate-50 border-b text-[10px] uppercase text-slate-400 font-black tracking-widest">
+                <div className="p-4 border-b bg-slate-50/50 font-bold text-slate-700 text-xs uppercase tracking-widest">Senarai Kelas Harian</div>
+                <table className="w-full text-left">
+                  <thead className="hidden md:table-header-group bg-slate-50 text-[10px] uppercase text-slate-400 font-black">
                     <tr><th className="p-5">Nama Kelas</th><th>Status</th><th>Bil</th><th>Nama Murid Tidak Hadir</th><th className="text-right p-5">Tindakan</th></tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-sm">
+                  <tbody className="divide-y divide-slate-100">
                     {Object.keys(studentsData).map(c => {
-                      const cleanC = c.trim();
-                      const d = (attendanceData[currentDate] || {})[cleanC];
+                      const d = (attendanceData[currentDate] || {})[c.trim()];
                       return (
-                        <tr key={c} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="p-5"><strong>{c}</strong><br/><span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{studentsData[c].length} Murid</span></td>
-                          <td>{d ? <span className="text-emerald-600 font-black text-xs uppercase tracking-tighter">✓ SELESAI</span> : <span className="text-amber-500 font-black text-xs italic tracking-tighter uppercase">⏳ Belum Diisi</span>}</td>
-                          <td className="font-black text-slate-700">{d ? d.bilTakHadir : '-'}</td>
-                          <td>
+                        <tr key={c} className="hover:bg-slate-50/50 transition-colors flex flex-col md:table-row p-4 md:p-0">
+                          <td className="md:p-5 font-black text-slate-800">{c}</td>
+                          <td className="py-2 md:py-0">{d ? <span className="text-emerald-600 font-black text-xs">✓ SELESAI</span> : <span className="text-amber-500 font-black text-xs italic uppercase">⏳ BELUM DIISI</span>}</td>
+                          <td className="font-black text-slate-700 py-1 md:py-0">{d ? d.bilTakHadir : '-'}</td>
+                          <td className="py-2 md:py-0">
                             {d && d.bilTakHadir > 0 ? (
-                                <div className="flex flex-wrap gap-1 max-w-sm py-2">
-                                    {d.namaTakHadir.map((n, i) => <span key={i} className="bg-rose-50 text-rose-600 text-[10px] px-2 py-1 rounded-md border border-rose-100 font-bold shadow-sm">{n}</span>)}
-                                </div>
-                            ) : d ? <span className="text-slate-300 italic text-xs font-medium tracking-tight">Tiada (Semua Hadir)</span> : '-'}
+                                <div className="flex flex-wrap gap-1">{d.namaTakHadir.map((n, i) => <span key={i} className="bg-rose-50 text-rose-600 text-[10px] px-2 py-0.5 rounded border border-rose-100 font-bold">{n}</span>)}</div>
+                            ) : d ? <span className="text-slate-300 text-xs italic">Hadir Semua</span> : '-'}
                           </td>
-                          <td className="p-5 text-right">
-                            <button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className={`px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${d ? 'bg-slate-100 text-slate-400 hover:bg-slate-200' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100'}`}>{d ? 'Kemaskini' : 'Isi Kehadiran'}</button>
+                          <td className="md:p-5 text-right pt-4 md:pt-0">
+                            <button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className={`w-full md:w-auto px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest ${d ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white shadow-md shadow-indigo-100'}`}>{d ? 'Kemaskini' : 'Isi Kehadiran'}</button>
                           </td>
                         </tr>
                       );
@@ -246,63 +181,45 @@
               </div>
             </div>
           ) : (
-            /* FORM VIEW */
-            <div className="bg-white p-6 rounded-3xl border shadow-2xl max-w-lg mx-auto w-full my-auto animate-slide-up border-slate-100">
-              <button onClick={() => setCurrentView('dashboard')} className="flex items-center text-xs font-black text-slate-400 hover:text-indigo-600 uppercase tracking-[0.3em] mb-10 group transition-all">
-                <i className="fas fa-arrow-left mr-2 group-hover:-translate-x-2 transition-transform"></i> Kembali ke Papan Pemuka
-              </button>
-
+            <div className="bg-white p-8 rounded-3xl border shadow-2xl max-w-lg mx-auto w-full my-auto animate-slide-up">
+              <button onClick={() => setCurrentView('dashboard')} className="flex items-center text-xs font-black text-slate-400 hover:text-indigo-600 uppercase mb-10 tracking-widest"><i className="fas fa-arrow-left mr-2"></i> Kembali</button>
               <h2 className="text-3xl font-black mb-1 text-slate-800 uppercase tracking-tighter">KELAS {selectedClass}</h2>
-              <p className="text-[10px] text-slate-400 mb-8 font-bold uppercase tracking-widest border-b border-slate-100 pb-4">Pengisian Kehadiran Murid</p>
-              
+              <p className="text-[10px] text-slate-400 mb-8 font-bold uppercase tracking-widest border-b pb-4">Pengisian Kehadiran Murid</p>
               <div className="space-y-8">
                 <div className="space-y-3">
-                  <label className="block text-xs font-black text-slate-600 uppercase tracking-widest">1. Berapa orang murid tidak hadir?</label>
-                  <select className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black text-indigo-600 outline-none focus:border-indigo-500 transition-all cursor-pointer" value={formBilTakHadir} onChange={e => { const v = parseInt(e.target.value); setFormBilTakHadir(v); setFormSelectedNames(new Array(v).fill('')); }}>
+                  <label className="block text-xs font-black text-slate-600 uppercase">1. Berapa orang tidak hadir?</label>
+                  <select className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black text-indigo-600" value={formBilTakHadir} onChange={e => { const v = parseInt(e.target.value); setFormBilTakHadir(v); setFormSelectedNames(new Array(v).fill('')); }}>
                     {[...Array(studentsData[selectedClass].length + 1).keys()].map(n => <option key={n} value={n}>{n} Orang</option>)}
                   </select>
                 </div>
-
                 {formBilTakHadir > 0 && (
-                  <div className="space-y-5 p-5 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-2">2. Pilih Nama Murid:</p>
+                  <div className="space-y-5 p-5 bg-slate-50 rounded-2xl border">
                     {Array.from({ length: formBilTakHadir }).map((_, i) => (
-                      <div key={i} className="animate-fade-in">
-                        <select className="w-full p-4 bg-white border-2 border-slate-100 rounded-xl shadow-sm font-bold text-slate-700 outline-none focus:border-rose-400 transition-all cursor-pointer" value={formSelectedNames[i]} onChange={e => { const n = [...formSelectedNames]; n[i] = e.target.value; setFormSelectedNames(n); }}>
-                            <option value="">-- SILAH PILIH NAMA --</option>
-                            {getAvailableOptions(i).map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
+                      <select key={i} className="w-full p-4 bg-white border rounded-xl font-bold text-slate-700" value={formSelectedNames[i]} onChange={e => { const n = [...formSelectedNames]; n[i] = e.target.value; setFormSelectedNames(n); }}>
+                        <option value="">-- PILIH NAMA --</option>
+                        {getAvailableOptions(i).map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
                     ))}
                   </div>
                 )}
-
-                {formError && <div className="bg-rose-50 p-4 rounded-2xl border border-rose-200 text-rose-600 text-[10px] font-black flex items-center gap-3 animate-bounce uppercase tracking-tighter"><i className="fas fa-exclamation-circle text-lg"></i>{formError}</div>}
-                
-                <div className="pt-6 space-y-4 text-center">
-                    <button onClick={handleSubmit} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all uppercase tracking-[0.2em]" disabled={isSubmitting}>{isSubmitting ? 'MENYIMPAN DATA...' : 'HANTAR LAPORAN'}</button>
-                    <button onClick={() => setCurrentView('dashboard')} className="w-full py-2 text-slate-300 text-[10px] font-black uppercase tracking-[0.4em] hover:text-rose-500 transition-colors font-bold">BATAL</button>
-                </div>
+                <button onClick={handleSubmit} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-xl uppercase tracking-widest" disabled={isSubmitting}>{isSubmitting ? 'MENYIMPAN...' : 'HANTAR LAPORAN'}</button>
+                <button onClick={() => setCurrentView('dashboard')} className="w-full text-slate-300 text-[10px] font-black uppercase tracking-widest">Batal</button>
               </div>
             </div>
           )}
-
-          <footer className="mt-16 text-center text-slate-300 text-[10px] uppercase border-t border-slate-100 pt-10 pb-12">
-            <p className="mb-2 tracking-[0.3em] font-bold uppercase">@HAK MILIK UNIT HEM, SK SG ABONG</p>
-            <p className="font-black text-slate-400 tracking-tighter tracking-widest uppercase">MODERATOR: ACAP GARANG</p>
+          <footer className="mt-16 text-center text-slate-300 text-[10px] uppercase border-t pt-10 pb-12 font-bold tracking-widest">
+            @HAK MILIK UNIT HEM, SK SG ABONG | MODERATOR: ACAP GARANG
           </footer>
         </div>
       );
     }
-
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
-  
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-    body { font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.02em; }
-    @keyframes vibrate { 0% { transform: translate(0); } 10% { transform: translate(-2px, -2px) rotate(-1deg); } 20% { transform: translate(2px, 2px) rotate(1deg); } 30% { transform: translate(-2px, 2px) rotate(-1deg); } 40% { transform: translate(2px, -2px) rotate(1deg); } 100% { transform: translate(0); } }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    @keyframes vibrate { 0% { transform: translate(0); } 10% { transform: translate(-2px, -2px) rotate(-1deg); } 20% { transform: translate(2px, 2px) rotate(1deg); } 40% { transform: translate(2px, -2px) rotate(1deg); } 100% { transform: translate(0); } }
     .animate-vibrate { animation: vibrate 0.1s linear infinite; }
     @keyframes hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
     .animate-hop { animation: hop 0.4s ease-in-out infinite; }
