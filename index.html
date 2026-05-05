@@ -125,17 +125,43 @@
         });
       };
 
+      // --- PERUBAHAN DI SINI (LOADING SCREEN) ---
       if (isLoading) return (
-        <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center">
-            <img src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" className="w-40 h-40 object-contain animate-vibrate" />
-            <p className="font-black text-slate-800 tracking-widest uppercase">Dalman sedang memerhatikan anda</p>
+        <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center p-6 animate-fade-in">
+            {/* Logo baru bergetar di atas wording */}
+            <img 
+              src="https://i.postimg.cc/GhcMcHbD/Dalman-Memerhati.jpg" 
+              className="w-48 h-48 md:w-60 md:h-60 object-contain animate-vibrate rounded-full shadow-lg" 
+              alt="Dalman Memerhati"
+            />
+            <div>
+                <p className="font-black text-slate-800 tracking-[0.2em] uppercase text-xl md:text-2xl">
+                    Dalman sedang memerhatikan anda
+                </p>
+                <p className="text-slate-400 text-xs mt-3 font-bold uppercase tracking-widest animate-pulse">Sila tunggu sebentar...</p>
+            </div>
         </div>
       );
 
+      // --- PERUBAHAN DI SINI (SUBMITTING SCREEN) ---
       if (isSubmitting) return (
-        <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center">
-            <img src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" className="w-40 h-40 object-contain animate-hop" />
-            <p className="font-black text-indigo-700 uppercase">GPK HEM berterima kasih atas kerjasama anda</p>
+        <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center p-6 animate-fade-in">
+            {/* Logo baru melompat di atas wording */}
+            <img 
+              src="https://i.postimg.cc/k5rKgpWf/Dalman-terima-kasih.jpg" 
+              className="w-48 h-48 md:w-60 md:h-60 object-contain animate-hop rounded-full shadow-lg" 
+              alt="Dalman Terima Kasih"
+            />
+            <div>
+                <p className="font-black text-indigo-700 tracking-tight uppercase text-xl md:text-2xl leading-tight">
+                    GPK HEM berterima kasih<br/>atas kerjasama anda
+                </p>
+                <div className="mt-8 flex justify-center gap-2.5">
+                    <div className="w-3.5 h-3.5 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0s'}}></div>
+                    <div className="w-3.5 h-3.5 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0.1s'}}></div>
+                    <div className="w-3.5 h-3.5 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0.2s'}}></div>
+                </div>
+            </div>
         </div>
       );
 
@@ -145,6 +171,7 @@
             <div className="space-y-6 flex-grow animate-fade-in">
               <div className="bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row items-center justify-between gap-6 border-slate-100">
                 <div className="flex items-center space-x-6">
+                  {/* Logo di Header Utama Kekal */}
                   <img src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" className="w-24 h-24 md:w-36 md:h-36 object-contain" />
                   <div>
                     <h1 className="text-lg md:text-2xl font-black text-slate-800 uppercase leading-tight">Dashboard Kehadiran SKSA</h1>
@@ -152,7 +179,6 @@
                   </div>
                 </div>
                 
-                {/* FIX KALENDAR: Ditambah fungsi paksa buka (showPicker) */}
                 <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 flex items-center gap-3 relative cursor-pointer hover:bg-indigo-100 transition-all group overflow-hidden shadow-sm">
                     <i className="far fa-calendar-check text-indigo-600 text-xl group-hover:scale-110 transition-transform"></i>
                     <span className="font-black text-indigo-800 text-lg tracking-wider">{getDisplayDateText(currentDate)}</span>
@@ -247,10 +273,25 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
-    @keyframes vibrate { 0% { transform: translate(0); } 10% { transform: translate(-2px, -2px) rotate(-1deg); } 20% { transform: translate(2px, 2px) rotate(1deg); } 40% { transform: translate(2px, -2px) rotate(1deg); } 100% { transform: translate(0); } }
+    
+    /* ANIMASI BERGETAR */
+    @keyframes vibrate {
+      0% { transform: translate(0); }
+      10% { transform: translate(-2px, -2px) rotate(-1deg); }
+      20% { transform: translate(2px, 2px) rotate(1deg); }
+      30% { transform: translate(-2px, 2px) rotate(-1deg); }
+      40% { transform: translate(2px, -2px) rotate(1deg); }
+      100% { transform: translate(0); }
+    }
     .animate-vibrate { animation: vibrate 0.1s linear infinite; }
-    @keyframes hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+
+    /* ANIMASI MELOMPAT KECIL */
+    @keyframes hop {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
     .animate-hop { animation: hop 0.4s ease-in-out infinite; }
+    
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
     .animate-fade-in { animation: fadeIn 0.6s ease-out; }
