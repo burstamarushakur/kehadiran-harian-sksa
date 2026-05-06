@@ -33,6 +33,7 @@
       const [isSubmitting, setIsSubmitting] = useState(false);
       const [currentView, setCurrentView] = useState('dashboard');
       const [selectedClass, setSelectedClass] = useState(null);
+      const [formBilTakHadir, setFormBilTakHadir] = useState(0);
       const [formSelectedNames, setFormSelectedNames] = useState([]);
       const [formError, setFormError] = useState('');
 
@@ -103,7 +104,6 @@
       }, [attendanceData, currentDate, studentsData]);
 
       const handleSubmit = async () => {
-        // Validation: Pastikan takde kotak yang dibiarkan '-- PILIH NAMA --'
         if (formSelectedNames.some(n => !n)) return setFormError('Sila pilih nama murid untuk kotak yang ditambah, atau tekan (X) untuk padam.');
         
         setIsSubmitting(true);
@@ -231,15 +231,12 @@
                                 <button 
                                   onClick={() => { 
                                     setSelectedClass(c); 
-                                    
-                                    // FUNGSI INGATAN: Kalau dah ada rekod, kita masukkan nama tu dalam form.
                                     const existingData = (attendanceData[currentDate] || {})[c.trim()];
                                     if (existingData && existingData.bilTakHadir > 0) {
                                       setFormSelectedNames([...existingData.namaTakHadir]);
                                     } else {
                                       setFormSelectedNames([]);
                                     }
-                                    
                                     setFormError(''); 
                                     setCurrentView('form'); 
                                   }} 
@@ -257,15 +254,15 @@
               </div>
             </div>
           ) : (
-            <div className="bg-white p-8 rounded-[2rem] border shadow-2xl max-w-lg mx-auto w-full my-auto animate-slide-up border-slate-100">
-              <button onClick={() => setCurrentView('dashboard')} className="flex items-center text-xs font-black text-slate-400 hover:text-indigo-600 uppercase mb-10 tracking-[0.2em]"><i className="fas fa-arrow-left mr-2"></i> Kembali ke Papan Pemuka</button>
-              <h2 className="text-3xl font-black mb-1 text-slate-800 uppercase tracking-tighter text-center">KELAS {selectedClass}</h2>
-              <p className="text-[10px] text-slate-400 mb-8 font-bold uppercase tracking-widest border-b pb-5 text-center">Unit HEM SK Sungai Abong</p>
+            <div className="bg-white p-6 md:p-8 rounded-[2rem] border shadow-2xl max-w-lg mx-auto w-full my-auto animate-slide-up border-slate-100">
+              <button onClick={() => setCurrentView('dashboard')} className="flex items-center text-xs font-black text-slate-400 hover:text-indigo-600 uppercase mb-8 md:mb-10 tracking-[0.2em]"><i className="fas fa-arrow-left mr-2"></i> Kembali</button>
+              <h2 className="text-2xl md:text-3xl font-black mb-1 text-slate-800 uppercase tracking-tighter text-center">KELAS {selectedClass}</h2>
+              <p className="text-[10px] text-slate-400 mb-6 md:mb-8 font-bold uppercase tracking-widest border-b pb-4 md:pb-5 text-center">Unit HEM SK Sungai Abong</p>
               
               <div className="space-y-6">
                 
-                {/* --- FUNGSI DYNAMIC LIST BARU --- */}
-                <div className="space-y-4 p-5 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
+                {/* --- FIX UNTUK RESPONSIVE MOBILE TANDA PANGKAH --- */}
+                <div className="space-y-4 p-4 md:p-5 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner overflow-hidden">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Senarai Murid Tidak Hadir:</p>
                     
                     {formSelectedNames.length === 0 ? (
@@ -275,18 +272,21 @@
                         </div>
                     ) : (
                         formSelectedNames.map((name, i) => (
-                            <div key={i} className="flex gap-2 animate-fade-in">
+                            <div key={i} className="flex gap-2 items-stretch animate-fade-in w-full">
+                                {/* flex-1 dan min-w-0 penting supaya nama panjang terpotong (truncate) dan tak tolak butang pangkah */}
                                 <select 
-                                    className="flex-grow p-4 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-700 shadow-sm outline-none focus:border-rose-400 cursor-pointer" 
+                                    className="flex-1 min-w-0 p-3 md:p-4 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-700 text-xs md:text-sm shadow-sm outline-none focus:border-rose-400 cursor-pointer text-ellipsis overflow-hidden whitespace-nowrap" 
                                     value={name} 
                                     onChange={e => { const n = [...formSelectedNames]; n[i] = e.target.value; setFormSelectedNames(n); }}
                                 >
                                     <option value="">-- PILIH NAMA MURID --</option>
                                     {getAvailableOptions(i).map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
+                                
+                                {/* flex-shrink-0 supaya butang ni maintain saiz tak kira apa jadi */}
                                 <button 
                                     onClick={() => { const n = [...formSelectedNames]; n.splice(i, 1); setFormSelectedNames(n); }} 
-                                    className="bg-rose-50 text-rose-500 w-14 rounded-xl border-2 border-rose-100 flex items-center justify-center hover:bg-rose-100 transition-colors"
+                                    className="flex-shrink-0 bg-rose-50 text-rose-500 w-12 md:w-14 rounded-xl border-2 border-rose-100 flex items-center justify-center hover:bg-rose-100 transition-colors"
                                     title="Padam"
                                 >
                                     <i className="fas fa-times text-lg"></i>
@@ -295,13 +295,12 @@
                         ))
                     )}
 
-                    {/* Tombol Tambah (+) */}
                     {formSelectedNames.length < (studentsData[selectedClass]?.length || 0) && (
                         <button 
                             onClick={() => setFormSelectedNames([...formSelectedNames, ''])} 
                             className="w-full py-4 mt-2 bg-indigo-50 hover:bg-indigo-100 border-2 border-dashed border-indigo-200 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-[10px] transition-colors flex items-center justify-center gap-2"
                         >
-                            <i className="fas fa-plus"></i> Tambah Murid Tidak Hadir
+                            <i className="fas fa-plus"></i> Tambah Murid
                         </button>
                     )}
                 </div>
@@ -309,7 +308,7 @@
                 {formError && <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100 text-rose-600 text-[10px] font-black flex items-center gap-3 animate-bounce"><i className="fas fa-exclamation-circle text-lg"></i>{formError}</div>}
                 
                 <div className="pt-4 space-y-4">
-                    <button onClick={handleSubmit} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-2xl shadow-indigo-200 uppercase tracking-widest" disabled={isSubmitting}>{isSubmitting ? 'MENYIMPAN...' : 'HANTAR LAPORAN'}</button>
+                    <button onClick={handleSubmit} className="w-full py-4 md:py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-2xl shadow-indigo-200 uppercase tracking-widest text-xs md:text-sm" disabled={isSubmitting}>{isSubmitting ? 'MENYIMPAN...' : 'HANTAR LAPORAN'}</button>
                     <button onClick={() => setCurrentView('dashboard')} className="w-full py-2 text-slate-300 text-[10px] font-black uppercase tracking-[0.4em] hover:text-rose-500 font-bold">Batal</button>
                 </div>
               </div>
