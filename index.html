@@ -125,10 +125,8 @@
         });
       };
 
-      // --- PERUBAHAN DI SINI (LOADING SCREEN) ---
       if (isLoading) return (
         <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center p-6 animate-fade-in">
-            {/* Logo baru bergetar di atas wording */}
             <img 
               src="https://i.postimg.cc/GhcMcHbD/Dalman-Memerhati.jpg" 
               className="w-48 h-48 md:w-60 md:h-60 object-contain animate-vibrate rounded-full shadow-lg" 
@@ -143,10 +141,8 @@
         </div>
       );
 
-      // --- PERUBAHAN DI SINI (SUBMITTING SCREEN) ---
       if (isSubmitting) return (
         <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center p-6 animate-fade-in">
-            {/* Logo baru melompat di atas wording */}
             <img 
               src="https://i.postimg.cc/k5rKgpWf/Dalman-terima-kasih.jpg" 
               className="w-48 h-48 md:w-60 md:h-60 object-contain animate-hop rounded-full shadow-lg" 
@@ -171,8 +167,12 @@
             <div className="space-y-6 flex-grow animate-fade-in">
               <div className="bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row items-center justify-between gap-6 border-slate-100">
                 <div className="flex items-center space-x-6">
-                  {/* Logo di Header Utama Kekal */}
-                  <img src="https://i.postimg.cc/vHfb7N7V/Whats-App-Image-2026-03-04-at-10-00-06.jpg" className="w-24 h-24 md:w-36 md:h-36 object-contain" />
+                  {/* --- PERUBAHAN DI SINI (LOGO HEADER UTAMA) --- */}
+                  <img 
+                    src="https://i.postimg.cc/QMNXZ1dg/4a8775a0-2469-46a1-8898-ba31fc417737.png" 
+                    className="w-24 h-24 md:w-36 md:h-36 object-contain" 
+                    alt="Logo SKSA Baru"
+                  />
                   <div>
                     <h1 className="text-lg md:text-2xl font-black text-slate-800 uppercase leading-tight">Dashboard Kehadiran SKSA</h1>
                     <p className="text-xs font-bold text-slate-400 tracking-widest uppercase mt-1">UNIT HEM, MUAR JOHOR</p>
