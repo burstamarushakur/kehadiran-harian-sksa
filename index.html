@@ -33,7 +33,6 @@
       const [isSubmitting, setIsSubmitting] = useState(false);
       const [currentView, setCurrentView] = useState('dashboard');
       const [selectedClass, setSelectedClass] = useState(null);
-      const [formBilTakHadir, setFormBilTakHadir] = useState(0);
       const [formSelectedNames, setFormSelectedNames] = useState([]);
       const [formError, setFormError] = useState('');
 
@@ -104,12 +103,22 @@
       }, [attendanceData, currentDate, studentsData]);
 
       const handleSubmit = async () => {
-        if (formBilTakHadir > 0 && formSelectedNames.some(n => !n)) return setFormError('Sila pilih nama murid.');
+        // Validation: Pastikan takde kotak yang dibiarkan '-- PILIH NAMA --'
+        if (formSelectedNames.some(n => !n)) return setFormError('Sila pilih nama murid untuk kotak yang ditambah, atau tekan (X) untuk padam.');
+        
         setIsSubmitting(true);
         try {
           await fetch(GAS_URL, { 
             method: 'POST', 
-            body: JSON.stringify({ action: 'simpanKehadiran', payload: { tarikh: formatDateDisplay(currentDate), kelas: selectedClass.trim(), bilTakHadir: formBilTakHadir, namaTakHadir: formSelectedNames }}) 
+            body: JSON.stringify({ 
+              action: 'simpanKehadiran', 
+              payload: { 
+                tarikh: formatDateDisplay(currentDate), 
+                kelas: selectedClass.trim(), 
+                bilTakHadir: formSelectedNames.length, 
+                namaTakHadir: formSelectedNames 
+              }
+            }) 
           });
           await fetchAllData();
           setCurrentView('dashboard');
@@ -167,7 +176,6 @@
             <div className="space-y-6 flex-grow animate-fade-in">
               <div className="bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row items-center justify-between gap-6 border-slate-100">
                 <div className="flex items-center space-x-6">
-                  {/* --- PERUBAHAN DI SINI (LOGO HEADER UTAMA) --- */}
                   <img 
                     src="https://i.postimg.cc/QMNXZ1dg/4a8775a0-2469-46a1-8898-ba31fc417737.png" 
                     className="w-24 h-24 md:w-36 md:h-36 object-contain" 
@@ -220,7 +228,25 @@
                                 ) : d ? <span className="text-slate-300 text-xs italic">Hadir Semua</span> : '-'}
                             </td>
                             <td className="md:p-5 text-right pt-4 md:pt-0">
-                                <button onClick={() => { setSelectedClass(c); setFormBilTakHadir(0); setFormSelectedNames([]); setCurrentView('form'); }} className={`w-full md:w-auto px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${d ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:scale-105'}`}>{d ? 'Kemaskini' : 'Isi Kehadiran'}</button>
+                                <button 
+                                  onClick={() => { 
+                                    setSelectedClass(c); 
+                                    
+                                    // FUNGSI INGATAN: Kalau dah ada rekod, kita masukkan nama tu dalam form.
+                                    const existingData = (attendanceData[currentDate] || {})[c.trim()];
+                                    if (existingData && existingData.bilTakHadir > 0) {
+                                      setFormSelectedNames([...existingData.namaTakHadir]);
+                                    } else {
+                                      setFormSelectedNames([]);
+                                    }
+                                    
+                                    setFormError(''); 
+                                    setCurrentView('form'); 
+                                  }} 
+                                  className={`w-full md:w-auto px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${d ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:scale-105'}`}
+                                >
+                                  {d ? 'Kemaskini' : 'Isi Kehadiran'}
+                                </button>
                             </td>
                             </tr>
                         );
@@ -235,25 +261,53 @@
               <button onClick={() => setCurrentView('dashboard')} className="flex items-center text-xs font-black text-slate-400 hover:text-indigo-600 uppercase mb-10 tracking-[0.2em]"><i className="fas fa-arrow-left mr-2"></i> Kembali ke Papan Pemuka</button>
               <h2 className="text-3xl font-black mb-1 text-slate-800 uppercase tracking-tighter text-center">KELAS {selectedClass}</h2>
               <p className="text-[10px] text-slate-400 mb-8 font-bold uppercase tracking-widest border-b pb-5 text-center">Unit HEM SK Sungai Abong</p>
-              <div className="space-y-8">
-                <div className="space-y-3">
-                  <label className="block text-xs font-black text-slate-600 uppercase tracking-widest text-center">1. Bilangan murid tidak hadir?</label>
-                  <select className="w-full p-4 bg-slate-50 border-2 border-slate-50 rounded-2xl font-black text-indigo-600 outline-none focus:border-indigo-500" value={formBilTakHadir} onChange={e => { const v = parseInt(e.target.value); setFormBilTakHadir(v); setFormSelectedNames(new Array(v).fill('')); }}>
-                    {[...Array(studentsData[selectedClass].length + 1).keys()].map(n => <option key={n} value={n}>{n} Orang</option>)}
-                  </select>
+              
+              <div className="space-y-6">
+                
+                {/* --- FUNGSI DYNAMIC LIST BARU --- */}
+                <div className="space-y-4 p-5 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Senarai Murid Tidak Hadir:</p>
+                    
+                    {formSelectedNames.length === 0 ? (
+                        <div className="bg-emerald-50 border border-emerald-100 p-6 rounded-xl text-center">
+                            <p className="text-emerald-600 font-black text-sm uppercase tracking-widest"><i className="fas fa-check-circle mr-2"></i>HADIR SEMUA</p>
+                            <p className="text-emerald-500 text-[10px] mt-2 font-bold uppercase">Klik Hantar Laporan jika tiada murid yang tidak hadir</p>
+                        </div>
+                    ) : (
+                        formSelectedNames.map((name, i) => (
+                            <div key={i} className="flex gap-2 animate-fade-in">
+                                <select 
+                                    className="flex-grow p-4 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-700 shadow-sm outline-none focus:border-rose-400 cursor-pointer" 
+                                    value={name} 
+                                    onChange={e => { const n = [...formSelectedNames]; n[i] = e.target.value; setFormSelectedNames(n); }}
+                                >
+                                    <option value="">-- PILIH NAMA MURID --</option>
+                                    {getAvailableOptions(i).map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                                <button 
+                                    onClick={() => { const n = [...formSelectedNames]; n.splice(i, 1); setFormSelectedNames(n); }} 
+                                    className="bg-rose-50 text-rose-500 w-14 rounded-xl border-2 border-rose-100 flex items-center justify-center hover:bg-rose-100 transition-colors"
+                                    title="Padam"
+                                >
+                                    <i className="fas fa-times text-lg"></i>
+                                </button>
+                            </div>
+                        ))
+                    )}
+
+                    {/* Tombol Tambah (+) */}
+                    {formSelectedNames.length < (studentsData[selectedClass]?.length || 0) && (
+                        <button 
+                            onClick={() => setFormSelectedNames([...formSelectedNames, ''])} 
+                            className="w-full py-4 mt-2 bg-indigo-50 hover:bg-indigo-100 border-2 border-dashed border-indigo-200 text-indigo-600 rounded-xl font-black uppercase tracking-widest text-[10px] transition-colors flex items-center justify-center gap-2"
+                        >
+                            <i className="fas fa-plus"></i> Tambah Murid Tidak Hadir
+                        </button>
+                    )}
                 </div>
-                {formBilTakHadir > 0 && (
-                  <div className="space-y-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-center">2. Pilih Nama Murid:</p>
-                    {Array.from({ length: formBilTakHadir }).map((_, i) => (
-                      <select key={i} className="w-full p-4 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-700 shadow-sm" value={formSelectedNames[i]} onChange={e => { const n = [...formSelectedNames]; n[i] = e.target.value; setFormSelectedNames(n); }}>
-                        <option value="">-- PILIH NAMA --</option>
-                        {getAvailableOptions(i).map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    ))}
-                  </div>
-                )}
+
                 {formError && <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100 text-rose-600 text-[10px] font-black flex items-center gap-3 animate-bounce"><i className="fas fa-exclamation-circle text-lg"></i>{formError}</div>}
+                
                 <div className="pt-4 space-y-4">
                     <button onClick={handleSubmit} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-2xl shadow-indigo-200 uppercase tracking-widest" disabled={isSubmitting}>{isSubmitting ? 'MENYIMPAN...' : 'HANTAR LAPORAN'}</button>
                     <button onClick={() => setCurrentView('dashboard')} className="w-full py-2 text-slate-300 text-[10px] font-black uppercase tracking-[0.4em] hover:text-rose-500 font-bold">Batal</button>
@@ -274,7 +328,6 @@
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
     
-    /* ANIMASI BERGETAR */
     @keyframes vibrate {
       0% { transform: translate(0); }
       10% { transform: translate(-2px, -2px) rotate(-1deg); }
@@ -285,7 +338,6 @@
     }
     .animate-vibrate { animation: vibrate 0.1s linear infinite; }
 
-    /* ANIMASI MELOMPAT KECIL */
     @keyframes hop {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-15px); }
