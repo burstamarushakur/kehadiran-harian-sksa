@@ -6,6 +6,7 @@
   <title>Dashboard Kehadiran HEM SKSA</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -14,10 +15,11 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
+    const { useState, useEffect, useMemo, useRef } = React;
 
-    // PASTIKAN URL INI ADALAH URL DEPLOYMENT GOOGLE SCRIPT CIKGU
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbxphS1-lxJ_E6u8tB4I-xCdW6MXaKaIlH2D50pSZfppqfNwtqHkDHAMbfwncs0ydvJv/exec';
+
+    const monthNames = ["Jan", "Feb", "Mac", "Apr", "Mei", "Jun", "Jul", "Ogo", "Sep", "Okt", "Nov", "Dis"];
 
     function App() {
       const getTodayMalaysia = () => {
@@ -33,9 +35,16 @@
       const [isSubmitting, setIsSubmitting] = useState(false);
       const [currentView, setCurrentView] = useState('dashboard');
       const [selectedClass, setSelectedClass] = useState(null);
-      const [formBilTakHadir, setFormBilTakHadir] = useState(0);
       const [formSelectedNames, setFormSelectedNames] = useState([]);
       const [formError, setFormError] = useState('');
+      
+      const [showChartModal, setShowChartModal] = useState(false);
+      const [chartMode, setChartMode] = useState('harian');
+
+      const pieCanvasRef = useRef(null);
+      const barCanvasRef = useRef(null);
+      const pieChartRef = useRef(null);
+      const barChartRef = useRef(null);
 
       const formatDateDisplay = (dateString) => {
         if (!dateString) return '';
@@ -93,32 +102,179 @@
 
       useEffect(() => { fetchAllData(); }, []);
 
-      const stats = useMemo(() => {
-        const daily = attendanceData[currentDate] || {};
-        let sub = 0, totalS = 0, absent = 0;
-        Object.entries(studentsData).forEach(([name, list]) => {
-          totalS += list.length;
-          if (daily[name.trim()]) { sub++; absent += daily[name.trim()].bilTakHadir; }
+      const analytics = useMemo(() => {
+        if (!studentsData || Object.keys(studentsData).length === 0) return null;
+
+        const targetDateObj = new Date(currentDate);
+        const targetMonth = targetDateObj.getMonth();
+        const targetYear = targetDateObj.getFullYear();
+
+        const school = {
+          dailyExpected: 0, dailyAbsences: 0,
+          monthlyExpected: 0, monthlyAbsences: 0,
+          sub: 0, totalC: Object.keys(studentsData).length, totalS: 0, absent: 0, pct: 0
+        };
+
+        const years = {};
+        const classesStats = {};
+
+        Object.entries(studentsData).forEach(([className, list]) => {
+          const cleanClassName = className.trim();
+          const studentsCount = list.length;
+          school.totalS += studentsCount;
+
+          const firstChar = cleanClassName.charAt(0);
+          let yearLabel = "";
+          if (cleanClassName.toUpperCase().startsWith("PRA")) {
+            yearLabel = "Prasekolah";
+          } else if (cleanClassName.toUpperCase().startsWith("SAIDINA")) {
+            // TUKAR SAIDINA KEPADA PPKI DI SINI
+            yearLabel = "PPKI";
+          } else if (!isNaN(firstChar)) {
+            yearLabel = "Tahun " + firstChar;
+          } else {
+            yearLabel = cleanClassName.split(' ')[0];
+          }
+
+          if (!years[yearLabel]) {
+            years[yearLabel] = { dailyExpected: 0, dailyAbsences: 0, monthlyExpected: 0, monthlyAbsences: 0 };
+          }
+
+          let classMonthlyExpected = 0;
+          let classMonthlyAbsences = 0;
+
+          Object.entries(attendanceData).forEach(([isoDate, classesMap]) => {
+            const recordDate = new Date(isoDate);
+            if (recordDate.getMonth() === targetMonth && recordDate.getFullYear() === targetYear) {
+              const classRecord = classesMap[cleanClassName];
+              if (classRecord) {
+                classMonthlyExpected += studentsCount;
+                classMonthlyAbsences += classRecord.bilTakHadir;
+              }
+            }
+          });
+
+          school.monthlyExpected += classMonthlyExpected;
+          school.monthlyAbsences += classMonthlyAbsences;
+          years[yearLabel].monthlyExpected += classMonthlyExpected;
+          years[yearLabel].monthlyAbsences += classMonthlyAbsences;
+
+          const dailyRecord = attendanceData[currentDate]?.[cleanClassName];
+          let hasFilledToday = false;
+          let dailyAbsences = 0;
+
+          if (dailyRecord) {
+            hasFilledToday = true;
+            dailyAbsences = dailyRecord.bilTakHadir;
+            school.sub++;
+            school.absent += dailyAbsences;
+
+            school.dailyExpected += studentsCount;
+            school.dailyAbsences += dailyAbsences;
+            years[yearLabel].dailyExpected += studentsCount;
+            years[yearLabel].dailyAbsences += dailyAbsences;
+          }
+
+          classesStats[cleanClassName] = {
+            hasFilledToday,
+            bilTakHadir: dailyAbsences,
+            dailyPct: studentsCount > 0 ? (((studentsCount - dailyAbsences) / studentsCount) * 100).toFixed(1) : "0.0",
+            monthlyPct: classMonthlyExpected > 0 ? (((classMonthlyExpected - classMonthlyAbsences) / classMonthlyExpected) * 100).toFixed(1) : "- "
+          };
         });
-        return { sub, totalC: Object.keys(studentsData).length, totalS, absent, pct: totalS > 0 ? (((totalS - absent) / totalS) * 100).toFixed(1) : 0 };
+
+        school.pct = school.totalS > 0 ? (((school.totalS - school.absent) / school.totalS) * 100).toFixed(1) : 0;
+
+        Object.keys(years).forEach(y => {
+          const yData = years[y];
+          yData.dailyStr = yData.dailyExpected > 0 ? (((yData.dailyExpected - yData.dailyAbsences) / yData.dailyExpected) * 100).toFixed(1) + '%' : '- %';
+          yData.monthlyStr = yData.monthlyExpected > 0 ? (((yData.monthlyExpected - yData.monthlyAbsences) / yData.monthlyExpected) * 100).toFixed(1) + '%' : '- %';
+        });
+
+        let statusText = "Belum Ada Pengisian";
+        if (school.sub > 0 && school.sub < school.totalC) statusText = `Diisi: ${school.sub}/${school.totalC} Kelas`;
+        else if (school.sub === school.totalC) statusText = "Semua Kelas Diisi";
+
+        let schoolMonthlyStr = school.monthlyExpected > 0 ? (((school.monthlyExpected - school.monthlyAbsences) / school.monthlyExpected) * 100).toFixed(1) + '%' : '- %';
+
+        return { school, years, classesStats, statusText, schoolMonthlyStr };
       }, [attendanceData, currentDate, studentsData]);
+
+      useEffect(() => {
+        if (!showChartModal || !analytics) return;
+
+        const expected = chartMode === 'harian' ? analytics.school.dailyExpected : analytics.school.monthlyExpected;
+        const absences = chartMode === 'harian' ? analytics.school.dailyAbsences : analytics.school.monthlyAbsences;
+        const present = expected - absences;
+
+        if (pieChartRef.current) pieChartRef.current.destroy();
+        if (pieCanvasRef.current) {
+          const ctxPie = pieCanvasRef.current.getContext('2d');
+          pieChartRef.current = new Chart(ctxPie, {
+            type: 'doughnut',
+            data: {
+              labels: ['Hadir', 'Tak Hadir'],
+              datasets: [{
+                data: expected > 0 ? [present, absences] : [1, 0],
+                backgroundColor: expected > 0 ? ['#059669', '#f43f5e'] : ['#e5e7eb', '#e5e7eb'],
+                borderWidth: 0,
+                hoverOffset: 4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              cutout: '75%',
+              plugins: { legend: { display: false }, tooltip: { enabled: expected > 0 } }
+            }
+          });
+        }
+
+        const classNames = Object.keys(studentsData).sort();
+        const classPcts = classNames.map(c => {
+          const stat = analytics.classesStats[c.trim()];
+          if (!stat) return 0;
+          if (chartMode === 'harian' && !stat.hasFilledToday) return 0;
+          return chartMode === 'harian' ? parseFloat(stat.dailyPct) : (stat.monthlyPct !== "- " ? parseFloat(stat.monthlyPct) : 0);
+        });
+
+        const barColor = chartMode === 'harian' ? '#4f46e5' : '#059669';
+
+        if (barChartRef.current) barChartRef.current.destroy();
+        if (barCanvasRef.current) {
+          const ctxBar = barCanvasRef.current.getContext('2d');
+          barChartRef.current = new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+              labels: classNames,
+              datasets: [{
+                label: 'Peratusan Kehadiran (%)',
+                data: classPcts,
+                backgroundColor: barColor,
+                borderRadius: 6,
+                barPercentage: 0.6
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: { beginAtZero: true, max: 100, grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 } } },
+                x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 45, minRotation: 45 } }
+              },
+              plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => context.raw + '%' } } }
+            }
+          });
+        }
+      }, [showChartModal, chartMode, analytics, studentsData]);
 
       const handleSubmit = async () => {
         if (formSelectedNames.some(n => !n)) return setFormError('Sila pilih nama murid untuk kotak yang ditambah, atau tekan (X) untuk padam.');
-        
         setIsSubmitting(true);
         try {
           await fetch(GAS_URL, { 
             method: 'POST', 
-            body: JSON.stringify({ 
-              action: 'simpanKehadiran', 
-              payload: { 
-                tarikh: formatDateDisplay(currentDate), 
-                kelas: selectedClass.trim(), 
-                bilTakHadir: formSelectedNames.length, 
-                namaTakHadir: formSelectedNames 
-              }
-            }) 
+            body: JSON.stringify({ action: 'simpanKehadiran', payload: { tarikh: formatDateDisplay(currentDate), kelas: selectedClass.trim(), bilTakHadir: formSelectedNames.length, namaTakHadir: formSelectedNames }}) 
           });
           await fetchAllData();
           setCurrentView('dashboard');
@@ -136,15 +292,9 @@
 
       if (isLoading) return (
         <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center p-6 animate-fade-in">
-            <img 
-              src="https://i.postimg.cc/GhcMcHbD/Dalman-Memerhati.jpg" 
-              className="w-48 h-48 md:w-60 md:h-60 object-contain animate-vibrate rounded-full shadow-lg" 
-              alt="Dalman Memerhati"
-            />
+            <img src="https://i.postimg.cc/GhcMcHbD/Dalman-Memerhati.jpg" className="w-48 h-48 md:w-60 md:h-60 object-contain animate-vibrate rounded-full shadow-lg" />
             <div>
-                <p className="font-black text-slate-800 tracking-[0.2em] uppercase text-xl md:text-2xl">
-                    Dalman sedang memerhatikan anda
-                </p>
+                <p className="font-black text-slate-800 tracking-[0.2em] uppercase text-xl md:text-2xl">Dalman sedang memerhatikan anda</p>
                 <p className="text-slate-400 text-xs mt-3 font-bold uppercase tracking-widest animate-pulse">Sila tunggu sebentar...</p>
             </div>
         </div>
@@ -152,15 +302,9 @@
 
       if (isSubmitting) return (
         <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center p-6 animate-fade-in">
-            <img 
-              src="https://i.postimg.cc/k5rKgpWf/Dalman-terima-kasih.jpg" 
-              className="w-48 h-48 md:w-60 md:h-60 object-contain animate-hop rounded-full shadow-lg" 
-              alt="Dalman Terima Kasih"
-            />
+            <img src="https://i.postimg.cc/k5rKgpWf/Dalman-terima-kasih.jpg" className="w-48 h-48 md:w-60 md:h-60 object-contain animate-hop rounded-full shadow-lg" />
             <div>
-                <p className="font-black text-indigo-700 tracking-tight uppercase text-xl md:text-2xl leading-tight">
-                    GPK HEM berterima kasih<br/>atas kerjasama anda
-                </p>
+                <p className="font-black text-indigo-700 tracking-tight uppercase text-xl md:text-2xl leading-tight">GPK HEM berterima kasih<br/>atas kerjasama anda</p>
                 <div className="mt-8 flex justify-center gap-2.5">
                     <div className="w-3.5 h-3.5 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0s'}}></div>
                     <div className="w-3.5 h-3.5 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0.1s'}}></div>
@@ -170,17 +314,15 @@
         </div>
       );
 
+      const currentMonthLabel = monthNames[new Date(currentDate).getMonth()];
+
       return (
         <div className="max-w-6xl mx-auto p-4 md:p-8 min-h-screen flex flex-col">
           {currentView === 'dashboard' ? (
             <div className="space-y-6 flex-grow animate-fade-in">
               <div className="bg-white p-6 rounded-2xl shadow-sm border flex flex-col md:flex-row items-center justify-between gap-6 border-slate-100">
                 <div className="flex items-center space-x-6">
-                  <img 
-                    src="https://i.postimg.cc/QMNXZ1dg/4a8775a0-2469-46a1-8898-ba31fc417737.png" 
-                    className="w-24 h-24 md:w-36 md:h-36 object-contain" 
-                    alt="Logo SKSA Baru"
-                  />
+                  <img src="https://i.postimg.cc/QMNXZ1dg/4a8775a0-2469-46a1-8898-ba31fc417737.png" className="w-24 h-24 md:w-36 md:h-36 object-contain" alt="Logo SKSA Baru" />
                   <div>
                     <h1 className="text-lg md:text-2xl font-black text-slate-800 uppercase leading-tight">Dashboard Kehadiran SKSA</h1>
                     <p className="text-xs font-bold text-slate-400 tracking-widest uppercase mt-1">UNIT HEM, MUAR JOHOR</p>
@@ -190,21 +332,40 @@
                 <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 flex items-center gap-3 relative cursor-pointer hover:bg-indigo-100 transition-all group overflow-hidden shadow-sm">
                     <i className="far fa-calendar-check text-indigo-600 text-xl group-hover:scale-110 transition-transform"></i>
                     <span className="font-black text-indigo-800 text-lg tracking-wider">{getDisplayDateText(currentDate)}</span>
-                    <input 
-                      type="date" 
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                      value={currentDate} 
-                      onChange={e => setCurrentDate(e.target.value)} 
-                      onClick={(e) => { try { e.target.showPicker(); } catch(err) {} }}
-                      title="Pilih Tarikh Lain"
-                    />
+                    <input type="date" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" value={currentDate} onChange={e => setCurrentDate(e.target.value)} onClick={(e) => { try { e.target.showPicker(); } catch(err) {} }} />
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                    <div onClick={() => setShowChartModal(true)} className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-2xl border border-indigo-100 cursor-pointer hover:bg-indigo-100 hover:scale-105 transition-all shadow-sm group relative">
+                        <i className="fas fa-chart-pie group-hover:animate-pulse"></i>
+                        <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-indigo-500 border border-white"></span>
+                        </span>
+                    </div>
+                    <div>
+                        <h3 className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Analisis Keseluruhan Sekolah</h3>
+                        <p className="text-slate-700 font-black text-base mt-0.5">{analytics?.statusText}</p>
+                    </div>
+                </div>
+                <div className="flex gap-3 w-full md:w-auto">
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex-1 text-center min-w-[110px]">
+                        <p className="text-indigo-500 text-[9px] font-bold uppercase">Hari Ini ({getDisplayDateText(currentDate).split('/')[0]} {currentMonthLabel})</p>
+                        <p className="text-indigo-700 font-black text-lg mt-0.5">{analytics?.school.dailyExpected > 0 ? analytics.school.pct + '%' : '- %'}</p>
+                    </div>
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex-1 text-center min-w-[110px]">
+                        <p className="text-emerald-500 text-[9px] font-bold uppercase">Bulan Ini ({currentMonthLabel})</p>
+                        <p className="text-emerald-700 font-black text-lg mt-0.5">{analytics?.schoolMonthlyStr}</p>
+                    </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm"><p className="text-[10px] text-slate-400 font-black uppercase mb-1">Status Pengisian</p><p className="text-xl font-black">{stats.sub} / {stats.totalC} <span className="text-xs font-normal">Kelas</span></p></div>
-                <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100 shadow-sm"><p className="text-[10px] text-rose-600 font-black uppercase mb-1 tracking-tighter">Tidak Hadir</p><p className="text-xl font-black text-rose-700">{stats.absent} / {stats.totalS} <span className="text-[10px] font-normal uppercase">Murid</span></p></div>
-                <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 col-span-2 md:col-span-1 shadow-sm"><p className="text-[10px] text-indigo-600 font-black uppercase mb-1">% Kehadiran</p><p className="text-xl font-black text-indigo-700">{stats.pct}%</p></div>
+                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm"><p className="text-[10px] text-slate-400 font-black uppercase mb-1">Status Pengisian</p><p className="text-xl font-black">{analytics?.school.sub} / {analytics?.school.totalC} <span className="text-xs font-normal">Kelas</span></p></div>
+                <div className="bg-rose-50 p-5 rounded-2xl border border-rose-100 shadow-sm"><p className="text-[10px] text-rose-600 font-black uppercase mb-1 tracking-tighter">Tidak Hadir</p><p className="text-xl font-black text-rose-700">{analytics?.school.absent} / {analytics?.school.totalS} <span className="text-[10px] font-normal uppercase">Murid</span></p></div>
+                <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 col-span-2 md:col-span-1 shadow-sm"><p className="text-[10px] text-indigo-600 font-black uppercase mb-1">% Kehadiran</p><p className="text-xl font-black text-indigo-700">{analytics?.school.pct}%</p></div>
               </div>
 
               <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
@@ -216,11 +377,28 @@
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                         {Object.keys(studentsData).map(c => {
-                        const d = (attendanceData[currentDate] || {})[c.trim()];
+                        const cleanC = c.trim();
+                        const d = (attendanceData[currentDate] || {})[cleanC];
+                        const classStats = analytics?.classesStats[cleanC];
                         return (
                             <tr key={c} className="hover:bg-slate-50/50 transition-colors flex flex-col md:table-row p-5 md:p-0">
-                            <td className="md:p-5 font-black text-slate-800 text-lg md:text-sm">{c}</td>
-                            <td className="py-2 md:py-0">{d ? <span className="text-emerald-600 font-black text-[10px] bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100 uppercase">✓ SELESAI</span> : <span className="text-amber-500 font-black text-[10px] bg-amber-50 px-2 py-1 rounded-full border border-amber-100 uppercase">⏳ BELUM DIISI</span>}</td>
+                            <td className="md:p-5 font-black text-slate-800 text-lg md:text-sm">
+                              {c}
+                              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight block mt-1">{studentsData[c].length} Murid</span>
+                              
+                              {/* PERATUSAN KELAS HARIAN & BULANAN (GAYA BARU) */}
+                              <div className="mt-2.5 bg-slate-50 border border-slate-100 p-2 rounded-xl inline-flex gap-3 shadow-sm">
+                                  <div>
+                                      <span className="block text-[8px] font-bold text-slate-400 uppercase">Hari Ini</span>
+                                      <span className={`text-xs font-black ${d ? 'text-indigo-600' : 'text-slate-300'}`}>{d ? classStats?.dailyPct + '%' : '- %'}</span>
+                                  </div>
+                                  <div className="border-l border-slate-200 pl-3">
+                                      <span className="block text-[8px] font-bold text-slate-400 uppercase">Bulan Ini</span>
+                                      <span className="text-xs font-black text-emerald-600">{classStats?.monthlyPct}%</span>
+                                  </div>
+                              </div>
+                            </td>
+                            <td className="py-2 md:py-0">{d ? <span className="text-emerald-600 font-black text-[10px] bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100 uppercase mt-2 md:mt-0 inline-block">✓ SELESAI</span> : <span className="text-amber-500 font-black text-[10px] bg-amber-50 px-2 py-1 rounded-full border border-amber-100 uppercase mt-2 md:mt-0 inline-block">⏳ BELUM DIISI</span>}</td>
                             <td className="font-black text-slate-700 py-1 md:py-0">{d ? d.bilTakHadir : '-'}</td>
                             <td className="py-2 md:py-0">
                                 {d && d.bilTakHadir > 0 ? (
@@ -231,7 +409,7 @@
                                 <button 
                                   onClick={() => { 
                                     setSelectedClass(c); 
-                                    const existingData = (attendanceData[currentDate] || {})[c.trim()];
+                                    const existingData = (attendanceData[currentDate] || {})[cleanC];
                                     if (existingData && existingData.bilTakHadir > 0) {
                                       setFormSelectedNames([...existingData.namaTakHadir]);
                                     } else {
@@ -240,7 +418,7 @@
                                     setFormError(''); 
                                     setCurrentView('form'); 
                                   }} 
-                                  className={`w-full md:w-auto px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${d ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:scale-105'}`}
+                                  className={`w-full md:w-auto px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${d ? 'bg-slate-100 text-slate-400 hover:bg-slate-200' : 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:scale-105'}`}
                                 >
                                   {d ? 'Kemaskini' : 'Isi Kehadiran'}
                                 </button>
@@ -260,8 +438,6 @@
               <p className="text-[10px] text-slate-400 mb-6 md:mb-8 font-bold uppercase tracking-widest border-b pb-4 md:pb-5 text-center">Unit HEM SK Sungai Abong</p>
               
               <div className="space-y-6">
-                
-                {/* --- FIX UNTUK RESPONSIVE MOBILE TANDA PANGKAH --- */}
                 <div className="space-y-4 p-4 md:p-5 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner overflow-hidden">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 text-center">Senarai Murid Tidak Hadir:</p>
                     
@@ -273,7 +449,6 @@
                     ) : (
                         formSelectedNames.map((name, i) => (
                             <div key={i} className="flex gap-2 items-stretch animate-fade-in w-full">
-                                {/* flex-1 dan min-w-0 penting supaya nama panjang terpotong (truncate) dan tak tolak butang pangkah */}
                                 <select 
                                     className="flex-1 min-w-0 p-3 md:p-4 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-700 text-xs md:text-sm shadow-sm outline-none focus:border-rose-400 cursor-pointer text-ellipsis overflow-hidden whitespace-nowrap" 
                                     value={name} 
@@ -282,12 +457,9 @@
                                     <option value="">-- PILIH NAMA MURID --</option>
                                     {getAvailableOptions(i).map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
-                                
-                                {/* flex-shrink-0 supaya butang ni maintain saiz tak kira apa jadi */}
                                 <button 
                                     onClick={() => { const n = [...formSelectedNames]; n.splice(i, 1); setFormSelectedNames(n); }} 
                                     className="flex-shrink-0 bg-rose-50 text-rose-500 w-12 md:w-14 rounded-xl border-2 border-rose-100 flex items-center justify-center hover:bg-rose-100 transition-colors"
-                                    title="Padam"
                                 >
                                     <i className="fas fa-times text-lg"></i>
                                 </button>
@@ -308,12 +480,95 @@
                 {formError && <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100 text-rose-600 text-[10px] font-black flex items-center gap-3 animate-bounce"><i className="fas fa-exclamation-circle text-lg"></i>{formError}</div>}
                 
                 <div className="pt-4 space-y-4">
-                    <button onClick={handleSubmit} className="w-full py-4 md:py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-2xl shadow-indigo-200 uppercase tracking-widest text-xs md:text-sm" disabled={isSubmitting}>{isSubmitting ? 'MENYIMPAN...' : 'HANTAR LAPORAN'}</button>
+                    <button onClick={handleSubmit} className="w-full py-4 md:py-5 bg-indigo-600 text-white rounded-2xl font-black shadow-2xl shadow-indigo-200 uppercase tracking-widest text-xs md:text-sm" disabled={isSubmitting}>HANTAR LAPORAN</button>
                     <button onClick={() => setCurrentView('dashboard')} className="w-full py-2 text-slate-300 text-[10px] font-black uppercase tracking-[0.4em] hover:text-rose-500 font-bold">Batal</button>
                 </div>
               </div>
             </div>
           )}
+
+          {showChartModal && (
+            <div className="fixed inset-0 z-40 bg-gray-900 bg-opacity-60 backdrop-blur-sm flex flex-col justify-end transition-opacity duration-300 p-2 md:p-0">
+              <div className="bg-slate-50 rounded-[2rem] shadow-2xl h-[90vh] md:h-[85vh] w-full max-w-3xl mx-auto flex flex-col animate-slide-up overflow-hidden border border-slate-200">
+                  
+                  <div className="px-6 pt-6 pb-4 bg-white border-b border-slate-100 flex justify-between items-start relative shrink-0">
+                      <button onClick={() => setShowChartModal(false)} className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 transition absolute left-6 z-10">
+                          <i class="fas fa-times"></i>
+                      </button>
+                      <div className="w-full text-center mt-1">
+                          <h3 className="font-extrabold text-lg md:text-xl text-slate-800 uppercase tracking-tight">ANALISIS CARTA KEHADIRAN</h3>
+                          <p className="text-[10px] text-indigo-500 font-bold uppercase mt-1 tracking-widest bg-indigo-50 inline-block px-3 py-1 rounded-full">TARIKH: {getDisplayDateText(currentDate)}</p>
+                      </div>
+                  </div>
+
+                  <div className="px-6 py-4 bg-white border-b border-slate-100 flex gap-2 shrink-0">
+                      <button 
+                        onClick={() => setChartMode('harian')} 
+                        className={`flex-1 py-3 text-[10px] md:text-xs font-black rounded-xl shadow-sm transition-all uppercase tracking-widest ${chartMode === 'harian' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                      >
+                          Analisis Harian
+                      </button>
+                      <button 
+                        onClick={() => setChartMode('bulanan')} 
+                        className={`flex-1 py-3 text-[10px] md:text-xs font-black rounded-xl shadow-sm transition-all uppercase tracking-widest ${chartMode === 'bulanan' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                      >
+                          Analisis Bulanan ({currentMonthLabel})
+                      </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-12">
+                      
+                      {/* --- KATEGORI PINDAH SINI (BENTUK GRID, TIADA SIDE SCROLL) --- */}
+                      <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                          <h4 className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Peratus Kehadiran Mengikut Kategori</h4>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              {analytics && Object.keys(analytics.years).sort().map(year => {
+                                  const yData = analytics.years[year];
+                                  return (
+                                    <div key={year} className="bg-slate-50 border border-slate-100 rounded-2xl p-3 shadow-sm relative overflow-hidden">
+                                        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-indigo-400"></div>
+                                        <p className="font-black text-slate-700 text-[10px] md:text-xs mb-2 pl-2 uppercase truncate">{year}</p>
+                                        <div className="flex justify-between items-end pl-2 gap-1.5 md:gap-2">
+                                            <div className="bg-indigo-100/50 px-1.5 py-1 md:py-1.5 rounded-lg flex-1 text-center border border-indigo-50">
+                                                <p className="text-[7px] md:text-[8px] text-indigo-500 uppercase font-bold">Hari</p>
+                                                <p className="text-indigo-700 font-black text-[10px] md:text-xs">{yData.dailyStr}</p>
+                                            </div>
+                                            <div className="bg-emerald-100/50 px-1.5 py-1 md:py-1.5 rounded-lg flex-1 text-center border border-emerald-50">
+                                                <p className="text-[7px] md:text-[8px] text-emerald-500 uppercase font-bold">Bulan</p>
+                                                <p className="text-emerald-700 font-black text-[10px] md:text-xs">{yData.monthlyStr}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                  );
+                              })}
+                          </div>
+                      </div>
+
+                      <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                          <h4 className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Carta Pai Keseluruhan Sekolah</h4>
+                          <div className="relative w-full h-[180px] md:h-[220px] mx-auto">
+                              <canvas ref={pieCanvasRef}></canvas>
+                              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pt-2">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase">Purata Hadir</span>
+                                  <span className="text-2xl font-black text-slate-800" id="chart-pie-center-pct">
+                                    {chartMode === 'harian' ? (analytics?.school.dailyExpected > 0 ? analytics.school.pct + '%' : '0%') : analytics?.schoolMonthlyStr}
+                                  </span>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                          <h4 class="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Carta Palang Peratusan Kelas</h4>
+                          <div className="relative w-full h-[300px] md:h-[350px]">
+                              <canvas ref={barCanvasRef}></canvas>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+            </div>
+          )}
+
           <footer className="mt-16 text-center text-slate-300 text-[10px] uppercase border-t border-slate-100 pt-10 pb-12 font-bold tracking-[0.2em]">
             @HAK MILIK UNIT HEM, SK SG ABONG | MODERATOR: ACAP GARANG
           </footer>
@@ -327,22 +582,10 @@
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
     
-    @keyframes vibrate {
-      0% { transform: translate(0); }
-      10% { transform: translate(-2px, -2px) rotate(-1deg); }
-      20% { transform: translate(2px, 2px) rotate(1deg); }
-      30% { transform: translate(-2px, 2px) rotate(-1deg); }
-      40% { transform: translate(2px, -2px) rotate(1deg); }
-      100% { transform: translate(0); }
-    }
+    @keyframes vibrate { 0% { transform: translate(0); } 10% { transform: translate(-2px, -2px) rotate(-1deg); } 20% { transform: translate(2px, 2px) rotate(1deg); } 30% { transform: translate(-2px, 2px) rotate(-1deg); } 40% { transform: translate(2px, -2px) rotate(1deg); } 100% { transform: translate(0); } }
     .animate-vibrate { animation: vibrate 0.1s linear infinite; }
-
-    @keyframes hop {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-15px); }
-    }
+    @keyframes hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
     .animate-hop { animation: hop 0.4s ease-in-out infinite; }
-    
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
     .animate-fade-in { animation: fadeIn 0.6s ease-out; }
