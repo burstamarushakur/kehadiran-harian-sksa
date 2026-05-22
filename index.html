@@ -128,7 +128,6 @@
           if (cleanClassName.toUpperCase().startsWith("PRA")) {
             yearLabel = "Prasekolah";
           } else if (cleanClassName.toUpperCase().startsWith("SAIDINA")) {
-            // TUKAR SAIDINA KEPADA PPKI DI SINI
             yearLabel = "PPKI";
           } else if (!isNaN(firstChar)) {
             yearLabel = "Tahun " + firstChar;
@@ -290,32 +289,32 @@
         });
       };
 
-      // --- PERUBAHAN 1: SKRIN LOADING UTAMA (Kini guna Kesabaran.png) ---
+      // --- FIX: DIRECT LINK IMAGES KESABARAN DARI POSTIMG ---
       if (isLoading) return (
-        <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center p-6 animate-fade-in">
+        <div className="flex h-screen items-center justify-center flex-col gap-6 bg-white text-center p-6 animate-fade-in">
             <img 
-              src="Kesabaran.png" 
-              className="w-48 h-48 md:w-60 md:h-60 object-contain animate-pulse rounded-full shadow-lg" 
+              src="https://i.postimg.cc/GtYSZDn0/Kesabaran.png" 
+              className="w-64 h-auto max-h-[50vh] object-contain animate-smooth-pulse rounded-2xl shadow-md border border-slate-100" 
               alt="Mohon Kesabaran Anda"
             />
             <div>
-                <p className="font-black text-slate-800 tracking-[0.2em] uppercase text-xl md:text-2xl">Mohon Kesabaran Anda</p>
-                <p className="text-slate-400 text-xs mt-3 font-bold uppercase tracking-widest animate-pulse">Sila tunggu sebentar, Unit HEM sedang memuatkan data...</p>
+                <p className="font-black text-slate-800 tracking-wide uppercase text-lg md:text-xl">Mohon Kesabaran Anda</p>
+                <p className="text-slate-400 text-xs mt-2 font-bold uppercase tracking-widest animate-pulse">Unit HEM sedang memuatkan data dari Google Sheet...</p>
             </div>
         </div>
       );
 
-      // --- PERUBAHAN 2: SKRIN TERIMA KASIH PENGISIAN (Kini guna Terima kasih.png) ---
+      // --- FIX: DIRECT LINK IMAGES TERIMA KASIH DARI POSTIMG ---
       if (isSubmitting) return (
-        <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center p-6 animate-fade-in">
+        <div className="flex h-screen items-center justify-center flex-col gap-6 bg-white text-center p-6 animate-fade-in">
             <img 
-              src="Terima kasih.png" 
-              className="w-48 h-48 md:w-60 md:h-60 object-contain animate-hop rounded-full shadow-lg" 
+              src="https://i.postimg.cc/vHFK505F/Terima-kasih.png" 
+              className="w-64 h-auto max-h-[50vh] object-contain animate-smooth-pulse rounded-2xl shadow-md border border-slate-100" 
               alt="Terima Kasih Atas Kerjasama"
             />
             <div>
-                <p className="font-black text-indigo-700 tracking-tight uppercase text-xl md:text-2xl leading-tight">GPK HEM berterima kasih<br/>atas kerjasama anda</p>
-                <div className="mt-8 flex justify-center gap-2.5">
+                <p className="font-black text-indigo-700 tracking-tight uppercase text-lg md:text-xl leading-tight">Laporan Berjaya Dihantar</p>
+                <div className="mt-5 flex justify-center gap-2.5">
                     <div className="w-3.5 h-3.5 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0s'}}></div>
                     <div className="w-3.5 h-3.5 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0.1s'}}></div>
                     <div className="w-3.5 h-3.5 bg-indigo-600 rounded-full animate-bounce" style={{animationDelay:'0.2s'}}></div>
@@ -396,7 +395,6 @@
                               {c}
                               <span className="text-[9px] text-slate-400 font-bold uppercase tracking-tight block mt-1">{studentsData[c].length} Murid</span>
                               
-                              {/* PERATUSAN KELAS HARIAN & BULANAN (GAYA BARU) */}
                               <div className="mt-2.5 bg-slate-50 border border-slate-100 p-2 rounded-xl inline-flex gap-3 shadow-sm">
                                   <div>
                                       <span className="block text-[8px] font-bold text-slate-400 uppercase">Hari Ini</span>
@@ -503,7 +501,7 @@
                   
                   <div className="px-6 pt-6 pb-4 bg-white border-b border-slate-100 flex justify-between items-start relative shrink-0">
                       <button onClick={() => setShowChartModal(false)} className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 transition absolute left-6 z-10">
-                          <i class="fas fa-times"></i>
+                          <i className="fas fa-times"></i>
                       </button>
                       <div className="w-full text-center mt-1">
                           <h3 className="font-extrabold text-lg md:text-xl text-slate-800 uppercase tracking-tight">ANALISIS CARTA KEHADIRAN</h3>
@@ -527,8 +525,6 @@
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-12">
-                      
-                      {/* --- KATEGORI PINDAH SINI (BENTUK GRID, TIADA SIDE SCROLL) --- */}
                       <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
                           <h4 className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Peratus Kehadiran Mengikut Kategori</h4>
                           
@@ -569,7 +565,7 @@
                       </div>
 
                       <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-                          <h4 class="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Carta Palang Peratusan Kelas</h4>
+                          <h4 className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Carta Palang Peratusan Kelas</h4>
                           <div className="relative w-full h-[300px] md:h-[350px]">
                               <canvas ref={barCanvasRef}></canvas>
                           </div>
