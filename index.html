@@ -290,19 +290,29 @@
         });
       };
 
+      // --- PERUBAHAN 1: SKRIN LOADING UTAMA (Kini guna Kesabaran.png) ---
       if (isLoading) return (
         <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center p-6 animate-fade-in">
-            <img src="https://i.postimg.cc/GhcMcHbD/Dalman-Memerhati.jpg" className="w-48 h-48 md:w-60 md:h-60 object-contain animate-vibrate rounded-full shadow-lg" />
+            <img 
+              src="Kesabaran.png" 
+              className="w-48 h-48 md:w-60 md:h-60 object-contain animate-pulse rounded-full shadow-lg" 
+              alt="Mohon Kesabaran Anda"
+            />
             <div>
-                <p className="font-black text-slate-800 tracking-[0.2em] uppercase text-xl md:text-2xl">Dalman sedang memerhatikan anda</p>
-                <p className="text-slate-400 text-xs mt-3 font-bold uppercase tracking-widest animate-pulse">Sila tunggu sebentar...</p>
+                <p className="font-black text-slate-800 tracking-[0.2em] uppercase text-xl md:text-2xl">Mohon Kesabaran Anda</p>
+                <p className="text-slate-400 text-xs mt-3 font-bold uppercase tracking-widest animate-pulse">Sila tunggu sebentar, Unit HEM sedang memuatkan data...</p>
             </div>
         </div>
       );
 
+      // --- PERUBAHAN 2: SKRIN TERIMA KASIH PENGISIAN (Kini guna Terima kasih.png) ---
       if (isSubmitting) return (
         <div className="flex h-screen items-center justify-center flex-col gap-8 bg-white text-center p-6 animate-fade-in">
-            <img src="https://i.postimg.cc/k5rKgpWf/Dalman-terima-kasih.jpg" className="w-48 h-48 md:w-60 md:h-60 object-contain animate-hop rounded-full shadow-lg" />
+            <img 
+              src="Terima kasih.png" 
+              className="w-48 h-48 md:w-60 md:h-60 object-contain animate-hop rounded-full shadow-lg" 
+              alt="Terima Kasih Atas Kerjasama"
+            />
             <div>
                 <p className="font-black text-indigo-700 tracking-tight uppercase text-xl md:text-2xl leading-tight">GPK HEM berterima kasih<br/>atas kerjasama anda</p>
                 <div className="mt-8 flex justify-center gap-2.5">
@@ -582,6 +592,13 @@
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
     
+    /* ANIMASI DENYUT LEMBUT (PULSE) UNTUK GAMBAR LOADING BARU */
+    @keyframes smooth-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(0.98); }
+    }
+    .animate-smooth-pulse { animation: smooth-pulse 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
     @keyframes vibrate { 0% { transform: translate(0); } 10% { transform: translate(-2px, -2px) rotate(-1deg); } 20% { transform: translate(2px, 2px) rotate(1deg); } 30% { transform: translate(-2px, 2px) rotate(-1deg); } 40% { transform: translate(2px, -2px) rotate(1deg); } 100% { transform: translate(0); } }
     .animate-vibrate { animation: vibrate 0.1s linear infinite; }
     @keyframes hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
