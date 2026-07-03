@@ -48,7 +48,7 @@
       const [adminActionType, setAdminActionType] = useState('tambah'); // 'tambah', 'buang', atau 'tukar'
       const [adminSelectedClass, setAdminSelectedClass] = useState('');
       const [adminTargetClass, setAdminTargetClass] = useState(''); // Untuk kelas baru murid
-      const [adminInputName, setAdminInputName] = useState('');
+      const [adminInputName, setAdminInputName] = useState(''); // Digunakan untuk Tambah Murid & Tukar Kelas (melalui dropdown)
       const [isAdminProcessing, setIsAdminProcessing] = useState(false);
       const [adminError, setAdminError] = useState('');
 
@@ -380,6 +380,12 @@
         setAdminError('');
       };
 
+      // Dapatkan senarai murid bagi kelas asal yang dipilih (Untuk modul Buang & Tukar Kelas)
+      const currentAdminClassStudents = useMemo(() => {
+        if (!adminSelectedClass || !studentsData[adminSelectedClass]) return [];
+        return studentsData[adminSelectedClass];
+      }, [adminSelectedClass, studentsData]);
+
       if (isLoading) return (
         <div className="flex h-screen items-center justify-center flex-col gap-6 bg-white text-center p-6 animate-fade-in">
             <img 
@@ -590,7 +596,7 @@
             </div>
           )}
 
-          {/* --- DIALOG MODAL: TETAPAN PENTADBIR UNIT HEM (KEMASKINI: TAMBAH TUKAR KELAS) --- */}
+          {/* --- DIALOG MODAL: TETAPAN PENTADBIR UNIT HEM --- */}
           {showAdminModal && (
             <div className="fixed inset-0 z-40 bg-gray-900 bg-opacity-60 backdrop-blur-sm flex flex-col justify-end md:justify-center p-2 md:p-4">
               <div className="bg-white rounded-[2rem] shadow-2xl max-w-md w-full mx-auto flex flex-col animate-slide-up overflow-hidden border border-slate-200 p-6 relative">
@@ -639,21 +645,21 @@
                     <div className="flex bg-slate-100 p-1 rounded-xl gap-1 border">
                       <button 
                         type="button"
-                        onClick={() => { setAdminActionType('tambah'); setAdminError(''); }}
+                        onClick={() => { setAdminActionType('tambah'); setAdminSelectedClass(''); setAdminInputName(''); setAdminError(''); }}
                         className={`flex-1 py-2 text-[9px] font-black uppercase tracking-tight rounded-lg transition-all ${adminActionType === 'tambah' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                       >
                         Tambah
                       </button>
                       <button 
                         type="button"
-                        onClick={() => { setAdminActionType('buang'); setAdminError(''); }}
+                        onClick={() => { setAdminActionType('buang'); setAdminSelectedClass(''); setAdminInputName(''); setAdminError(''); }}
                         className={`flex-1 py-2 text-[9px] font-black uppercase tracking-tight rounded-lg transition-all ${adminActionType === 'buang' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                       >
                         Buang
                       </button>
                       <button 
                         type="button"
-                        onClick={() => { setAdminActionType('tukar'); setAdminError(''); }}
+                        onClick={() => { setAdminActionType('tukar'); setAdminSelectedClass(''); setAdminInputName(''); setAdminError(''); }}
                         className={`flex-1 py-2 text-[9px] font-black uppercase tracking-tight rounded-lg transition-all ${adminActionType === 'tukar' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                       >
                         Tukar Kelas
@@ -668,14 +674,15 @@
 
                     {/* Susunan Input mengikut Pilihan Tab Aksi */}
                     <div className="space-y-3">
-                      {/* Pilihan Kelas Asal / Kelas Utama */}
+                      
+                      {/* Dropdown Pilihan Kelas (Sebagai Kelas Utama untuk Tambah/Buang, atau Kelas Asal untuk Tukar Kelas) */}
                       <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
                           {adminActionType === 'tukar' ? 'Pilih Kelas Asal' : 'Pilih Kelas'}
                         </label>
                         <select
                           value={adminSelectedClass}
-                          onChange={e => setAdminSelectedClass(e.target.value)}
+                          onChange={e => { setAdminSelectedClass(e.target.value); setAdminInputName(''); }}
                           className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 text-xs focus:bg-white focus:border-indigo-500 outline-none cursor-pointer"
                           required
                         >
@@ -686,7 +693,40 @@
                         </select>
                       </div>
 
-                      {/* Dropdown Pilih Kelas Baru jika memilih Aksi Tukar Kelas */}
+                      {/* INPUT NAMA MURID (Bertukar mengikut jenis Tab Tindakan) */}
+                      {adminActionType === 'tambah' ? (
+                        /* A: Kalau 'tambah', biar dia menaip nama murid baru */
+                        <div className="space-y-1 animate-fade-in">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Nama Penuh Murid Baru</label>
+                          <input 
+                            type="text"
+                            placeholder="Contoh: AMIR BIN ADNAN"
+                            value={adminInputName}
+                            onChange={e => setAdminInputName(e.target.value)}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 text-xs focus:bg-white focus:border-indigo-500 outline-none uppercase"
+                            required
+                          />
+                        </div>
+                      ) : (
+                        /* B: Kalau 'buang' atau 'tukar', terus bagi pilihan Dropdown Senarai Nama daripada Kelas Asal */
+                        <div className="space-y-1 animate-fade-in">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Pilih Nama Murid</label>
+                          <select
+                            value={adminInputName}
+                            onChange={e => setAdminInputName(e.target.value)}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 text-xs focus:bg-white focus:border-indigo-500 outline-none cursor-pointer"
+                            disabled={!adminSelectedClass}
+                            required
+                          >
+                            <option value="">{adminSelectedClass ? "-- PILIH NAMA MURID --" : "-- SILA PILIH KELAS DAHULU --"}</option>
+                            {currentAdminClassStudents.map((studentName, idx) => (
+                              <option key={idx} value={studentName}>{studentName}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Pilihan Kelas Baharu (Hanya dipaparkan jika memilih Modul Tukar Kelas) */}
                       {adminActionType === 'tukar' && (
                         <div className="space-y-1 animate-fade-in">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Pilih Kelas Baharu</label>
@@ -703,22 +743,9 @@
                           </select>
                         </div>
                       )}
-
-                      {/* Input Nama Murid */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Nama Penuh Murid</label>
-                        <input 
-                          type="text"
-                          placeholder="Masukkan nama penuh"
-                          value={adminInputName}
-                          onChange={e => setAdminInputName(e.target.value)}
-                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 text-xs focus:bg-white focus:border-indigo-500 outline-none uppercase"
-                          required
-                        />
-                      </div>
                     </div>
 
-                    {/* Butang Tindakan Penuh Dinamik */}
+                    {/* Butang Tindakan Utama Pentadbir */}
                     <button
                       type="submit"
                       disabled={isAdminProcessing}
@@ -729,7 +756,7 @@
                     >
                       {isAdminProcessing ? "Sedang Diproses..." : 
                        adminActionType === 'tambah' ? "Hantar & Tambah Murid" : 
-                       adminActionType === 'buang' ? "Hantar & Buang Murid" : "Proses Tukar Kelas"}
+                       adminActionType === 'buang' ? "Hantar & Padam Murid" : "Proses Tukar Kelas Murid"}
                     </button>
                   </form>
                 )}
